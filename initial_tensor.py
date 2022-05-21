@@ -10,6 +10,33 @@ Generate initial tensor A0 for different physical models
 """
 from tntools.initialtensors import get_initial_tensor
 
+MODEL_CHOICE = ("ising2d", "ising3d")
+
+
+def initial_tensor(model, model_parameters, is_sym=False):
+    """initial_tensor.
+    Current support `model`:
+        - "isng2d", "ising3d",
+            with `model_parameters.keys()`:
+            "temperature", "magnetic_field", "onsite_symmetry"
+
+    Parameters
+    ----------
+    model : str
+        model
+    model_parameters : dictionary
+        Key: model parameters
+    """
+    assert model in MODEL_CHOICE, "Model not supported yet!"
+    if model in ("ising2d", "ising3d"):
+        beta = 1 / model_parameters["temperature"]
+        ext_h = model_parameters["magnetic_field"]
+        if model == "ising2d":
+            res = ising_2d(beta, ext_h, is_sym)
+        elif model == "ising3d":
+            res = ising_3d(beta, ext_h, is_sym)
+    return res
+
 
 def ising_2d(beta=0.4, ext_h=0, is_sym=False):
     """
