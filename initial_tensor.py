@@ -9,8 +9,11 @@
 Generate initial tensor A0 for different physical models
 """
 from tntools.initialtensors import get_initial_tensor
+from abeliantensors import Tensor
+import numpy as np
+from ncon import ncon
 
-MODEL_CHOICE = ("ising2d", "ising3d")
+MODEL_CHOICE = ("ising2d", "ising3d", "golden chain")
 
 
 def initial_tensor(model, model_parameters, is_sym=False):
@@ -35,6 +38,8 @@ def initial_tensor(model, model_parameters, is_sym=False):
             res = ising_2d(beta, ext_h, is_sym)
         elif model == "ising3d":
             res = ising_3d(beta, ext_h, is_sym)
+    elif model == "golden chain":
+        res = golden_chain()
     return res
 
 
@@ -83,4 +88,54 @@ def ising_3d(beta=0.4, ext_h=0, is_sym=False):
     # rotate the tensor A[x, y, x', y', z, z'] to
     # A[x, x', y, y', z, z']
     init_ten = init_ten.transpose([0, 2, 1, 3, 4, 5])
+    return init_ten
+
+
+def golden_chain():
+    """golden_chain.
+    init_ten = gold_chain()
+
+    Initial tensor for the golden chain, or the fibonacci anyon model.
+
+    The initial tensor actually corresponds to the A_4 ABF model,
+    which is construction from the A_4 fusion categroy a la Aasen et al (2020).
+    We choose the spectrual parameter to be lambda/2 to make the model 90-deg
+    rotationally symmetric.
+
+    Although it seems the initial local degrees of freedom has 4 values,
+    the fusion rule breaks the square lattice into to two sublattice,
+    so the final local degrees of freedom has 2 values.
+    Thus, the initial tensor has bond dimension 2.
+
+    """
+    # initialize the local plaquette Boltzmann weight
+    boltz = Tensor.zeros(shape=[2, 2, 2, 2])
+    d_0 = 1.0
+    d_1 = 2 * np.cos(np.pi / 5)
+    # set non-vanishing values for the Boltzmann weight
+    overall_factor = np.sin(np.pi / 10)
+    boltz[1, 0, 1, 0] = np.sqrt(d_1 / d_0) + np.sqrt(d_0 / d_1)
+    boltz[0, 1, 0, 1] = np.sqrt(d_1 / d_0) + np.sqrt(d_0 / d_1)
+    boltz[1, 1, 1, 1] = 2.0
+    boltz[0, 1, 1, 1] = (d_0 / d_1)**(1/4)
+    boltz[1, 0, 1, 1] = (d_0 / d_1)**(1/4)
+    boltz[1, 1, 0, 1] = (d_0 / d_1)**(1/4)
+    boltz[1, 1, 1, 0] = (d_0 / d_1)**(1/4)
+    boltz = overall_factor * boltz
+
+    # define the gluing tensor
+    gluing_ten = Tensor.zeros(shape=[2, 2, 2, 2])
+    gluing_ten[0, 0, 0, 0] = 1
+    gluing_ten[1, 1, 1, 1] = 1
+
+    # contruct plaquette Boltzmann weight and
+    # the gluing tensor to get the initial tensor
+    init_ten = ncon([boltz, gluing_ten, boltz, gluing_ten],
+                    [[-2, -3, 3, 1], [3, -4, -6, 2],
+                     [4, 2, -5, -8], [-1, 1, 4, -7]])
+    init_ten = init_ten.reshape(4, 4, 4, 4)
+    # The 0-th dimension vanishing
+    # init_ten[0, :, :, :].norm() == 0 and so on.
+    init_ten = init_ten[1:, 1:, 1:, 1:]
+
     return init_ten

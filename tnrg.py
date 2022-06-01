@@ -7,6 +7,7 @@
 # Last Modified By  : Xinliang(Bruce) Lyu <lyu@issp.u-tokyo.ac.jp>
 
 import numpy as np
+from ncon import ncon
 from .initial_tensor import initial_tensor
 
 
@@ -14,7 +15,7 @@ class TensorNetworkRG:
     """
     Tensor network renormalization group
     """
-    model_choice = ("ising2d", "ising3d")
+    model_choice = ("ising2d", "ising3d", "golden chain")
     ising_models = ("ising2d", "ising3d")
 
     def __init__(self, model):
@@ -104,13 +105,58 @@ class TensorNetworkRG:
                 {"temperature": 1.0, "magnetic_field": 0.0,
                 "onsite_symmetry": False}
         """
-        self.current_tensor = initial_tensor(self.model,
-                                             self.model_parameters,
-                                             onsite_symmetry)
+        init_ten = initial_tensor(self.model, self.model_parameters,
+                                  onsite_symmetry)
+        self.tensor_magnitude.append(init_ten.norm())
+        self.current_tensor = init_ten / init_ten.norm()
 
 
 class TensorNetworkRG2D(TensorNetworkRG):
-    pass
+    """
+    TNRG for 2D square lattice
+    """
+    def block_tensor(self):
+        """
+        Block 4 tensors to be a single coarser tensor.
+        No truncation
+        """
+        ten_cur = self.get_tensor()
+        # block 4 tensors to for a new tensor (no truncation)
+        ten_new = ncon([ten_cur]*4, [[-2, -3, 3, 1], [3, -4, -6, 2],
+                                     [-1, 1, 4, -7], [4, 2, -5, -8]]
+                       )
+        ten_new = ten_new.join_indices((0, 1), (2, 3), (4, 5), (6, 7))
+        # pull out the tensor norm
+        self.tensor_magnitude.append(ten_new.norm())
+        self.current_tensor = ten_new / ten_new.norm()
+        self.iter_n += 1
+        assert len(self.tensor_magnitude) == (self.iter_n + 1)
+
+    def gu_wen_cardy(self, aspect_ratio=1, num_scale=12):
+        """
+        Extract the central charge and scaling dimensions
+        a la Gu, Wen and Cardy
+        """
+        # construct the transfer matrix
+        contract_list = [[k + 1, -(aspect_ratio + k + 1),
+                         (k + 1) % aspect_ratio + 1, -(k + 1)
+                          ] for k in range(aspect_ratio)
+                         ]
+        ten_cur = self.get_tensor()
+        ten_mag = self.get_tensor_magnitude()[-1]
+        ten_inv = ten_mag**(-1/3) * ten_cur
+        transfer_mat = ncon([ten_inv]*aspect_ratio,
+                            contract_list)
+        in_leg = [k for k in range(aspect_ratio)]
+        out_leg = [k + aspect_ratio for k in range(aspect_ratio)]
+        eig_val = transfer_mat.eig(in_leg, out_leg,
+                                   sparse=True, chis=num_scale)[0]
+        eig_val = eig_val.to_ndarray()
+        eig_val = np.abs(eig_val)
+        eig_val = -np.sort(-eig_val)
+        central_charge = np.log(eig_val[0]) * 6 / np.pi * aspect_ratio
+        scaling_dimensions = -np.log(eig_val/eig_val[0])/(2*np.pi)*aspect_ratio
+        return central_charge, scaling_dimensions
 
 
 class TensorNetworkRG3D(TensorNetworkRG):
