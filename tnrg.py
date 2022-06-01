@@ -126,6 +126,13 @@ class TensorNetworkRG2D(TensorNetworkRG):
                                      [-1, 1, 4, -7], [4, 2, -5, -8]]
                        )
         ten_new = ten_new.join_indices((0, 1), (2, 3), (4, 5), (6, 7))
+        # truncate the leg a la hosvd
+        proj_x = ten_new.svd([0], [1, 2, 3], eps=1e-15)[0]
+        proj_y = ten_new.svd([1], [2, 3, 0], eps=1e-15)[0]
+        ten_new = ncon([ten_new, proj_x.conjugate(), proj_x,
+                        proj_y.conjugate(), proj_y],
+                       [[1, 2, 3, 4], [1, -1], [3, -3],
+                        [2, -2], [4, -4]])
         # pull out the tensor norm
         self.tensor_magnitude.append(ten_new.norm())
         self.current_tensor = ten_new / ten_new.norm()
