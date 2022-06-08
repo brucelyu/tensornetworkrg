@@ -97,7 +97,7 @@ class TensorNetworkRG:
             self.model_parameters["temperature"] = 4.51152469
     # -------------------- #
 
-    def generate_initial_tensor(self, onsite_symmetry=False):
+    def generate_initial_tensor(self, onsite_symmetry=False, scheme="simple"):
         """
         generate the initial tensor corresponding to the model
         `model_parameters`: dictionary
@@ -106,7 +106,7 @@ class TensorNetworkRG:
                 "onsite_symmetry": False}
         """
         init_ten = initial_tensor(self.model, self.model_parameters,
-                                  onsite_symmetry)
+                                  onsite_symmetry, scheme)
         self.tensor_magnitude.append(init_ten.norm())
         self.current_tensor = init_ten / init_ten.norm()
 
@@ -127,17 +127,25 @@ class TensorNetworkRG2D(TensorNetworkRG):
                        )
         ten_new = ten_new.join_indices((0, 1), (2, 3), (4, 5), (6, 7))
         # truncate the leg a la hosvd
-        proj_x = ten_new.svd([0], [1, 2, 3], eps=1e-15)[0]
-        proj_y = ten_new.svd([1], [2, 3, 0], eps=1e-15)[0]
-        ten_new = ncon([ten_new, proj_x.conjugate(), proj_x,
-                        proj_y.conjugate(), proj_y],
-                       [[1, 2, 3, 4], [1, -1], [3, -3],
-                        [2, -2], [4, -4]])
+        ten_new = self.truncate_hosvd(ten_new)
         # pull out the tensor norm
         self.tensor_magnitude.append(ten_new.norm())
         self.current_tensor = ten_new / ten_new.norm()
         self.iter_n += 1
         assert len(self.tensor_magnitude) == (self.iter_n + 1)
+
+    @staticmethod
+    def truncate_hosvd(ten):
+        """
+        truncate a la hosvd
+        """
+        proj_x = ten.svd([0], [1, 2, 3], eps=1e-15)[0]
+        proj_y = ten.svd([1], [2, 3, 0], eps=1e-15)[0]
+        ten_new = ncon([ten, proj_x.conjugate(), proj_x,
+                        proj_y.conjugate(), proj_y],
+                       [[1, 2, 3, 4], [1, -1], [3, -3],
+                        [2, -2], [4, -4]])
+        return ten_new
 
     def gu_wen_cardy(self, aspect_ratio=1, num_scale=12):
         """

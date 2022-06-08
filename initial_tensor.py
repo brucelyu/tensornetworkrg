@@ -16,7 +16,8 @@ from ncon import ncon
 MODEL_CHOICE = ("ising2d", "ising3d", "golden chain")
 
 
-def initial_tensor(model, model_parameters, is_sym=False):
+def initial_tensor(model, model_parameters, is_sym=False,
+                   scheme="simple"):
     """initial_tensor.
     Current support `model`:
         - "isng2d", "ising3d",
@@ -39,7 +40,7 @@ def initial_tensor(model, model_parameters, is_sym=False):
         elif model == "ising3d":
             res = ising_3d(beta, ext_h, is_sym)
     elif model == "golden chain":
-        res = golden_chain()
+        res = golden_chain(scheme=scheme)
     return res
 
 
@@ -91,7 +92,7 @@ def ising_3d(beta=0.4, ext_h=0, is_sym=False):
     return init_ten
 
 
-def golden_chain():
+def golden_chain(scheme="simple"):
     """golden_chain.
     init_ten = gold_chain()
 
@@ -104,9 +105,18 @@ def golden_chain():
 
     Although it seems the initial local degrees of freedom has 4 values,
     the fusion rule breaks the square lattice into to two sublattice,
-    so the final local degrees of freedom has 2 values.
-    Thus, the initial tensor has bond dimension 2.
+    local boltzamann weight has bond dimension 2.
 
+    Parameters
+    ----------
+    scheme : str
+        ["simple", "symmetric"]
+        For "simple" scheme,
+            the tensor itself doesn't have reflection
+            or rotation symmetry, the bond dimension is 3.
+        For "symmetric" scheme,
+            the tensor itself has reflectoin and rotational
+            symmetry, the bond dimension is 5.
     """
     # initialize the local plaquette Boltzmann weight
     boltz = Tensor.zeros(shape=[2, 2, 2, 2])
@@ -123,19 +133,51 @@ def golden_chain():
     boltz[1, 1, 1, 0] = (d_0 / d_1)**(1/4)
     boltz = overall_factor * boltz
 
-    # define the gluing tensor
-    gluing_ten = Tensor.zeros(shape=[2, 2, 2, 2])
-    gluing_ten[0, 0, 0, 0] = 1
-    gluing_ten[1, 1, 1, 1] = 1
+    if scheme == "simple":
+        # define the gluing tensor
+        gluing_ten = Tensor.zeros(shape=[2, 2, 2, 2])
+        gluing_ten[0, 0, 0, 0] = 1
+        gluing_ten[1, 1, 1, 1] = 1
 
-    # contruct plaquette Boltzmann weight and
-    # the gluing tensor to get the initial tensor
-    init_ten = ncon([boltz, gluing_ten, boltz, gluing_ten],
-                    [[-2, -3, 3, 1], [3, -4, -6, 2],
-                     [4, 2, -5, -8], [-1, 1, 4, -7]])
-    init_ten = init_ten.reshape(4, 4, 4, 4)
-    # The 0-th dimension vanishing
-    # init_ten[0, :, :, :].norm() == 0 and so on.
-    init_ten = init_ten[1:, 1:, 1:, 1:]
+        # contruct plaquette Boltzmann weight and
+        # the gluing tensor to get the initial tensor
+        init_ten = ncon([boltz, gluing_ten, boltz, gluing_ten],
+                        [[-2, -3, 3, 1], [3, -4, -6, 2],
+                         [4, 2, -5, -8], [-1, 1, 4, -7]])
+        init_ten = init_ten.reshape(4, 4, 4, 4)
+        # The 0-th dimension vanishing
+        # init_ten[0, :, :, :].norm() == 0 and so on.
+        init_ten = init_ten[1:, 1:, 1:, 1:]
+    elif scheme == "symmetric":
+        # first tensor
+        ten_i = Tensor.zeros(shape=[3, 3, 3, 3])
+        ten_i[0, 0, 0, 0] = boltz[1, 0, 1, 0]
+        ten_i[1, 1, 1, 1] = boltz[0, 1, 0, 1]
+        ten_i[2, 2, 2, 2] = boltz[1, 1, 1, 1]
+        ten_i[1, 1, 2, 2] = boltz[0, 1, 1, 1]
+        ten_i[2, 0, 0, 2] = boltz[1, 0, 1, 1]
+        ten_i[2, 2, 1, 1] = boltz[1, 1, 0, 1]
+        ten_i[0, 2, 2, 0] = boltz[1, 1, 1, 0]
+        # second tensor
+        swap_mat = Tensor.zeros(shape=[3, 3])
+        swap_mat[2, 2] = 1
+        swap_mat[0, 1] = 1
+        swap_mat[1, 0] = 1
+        ten_ii = ncon([ten_i, swap_mat, swap_mat, swap_mat, swap_mat],
+                      [[1, 2, 3, 4], [1, -1], [2, -2],
+                       [3, -3], [4, -4]])
+        # contract two ten_i and two ten_ii
+        init_ten = ncon([ten_i, ten_ii, ten_i, ten_ii],
+                        [[-1, -3, 2, 1], [2, -4, -5, 3],
+                         [4, 3, -6, -8], [-2, 1, 4, -7]])
+        init_ten = init_ten.reshape(9, 9, 9, 9)
+        null_indx = np.array([1, 2, 3, 6])
+        for axis_n in range(4):
+            assert init_ten.take(indices=null_indx,
+                                 axis=axis_n).norm() < 1e-15
+        image_indx = np.array([0, 4, 8, 5, 7])
+        for axis_n in range(4):
+            init_ten = init_ten.take(indices=image_indx,
+                                     axis=axis_n)
 
     return init_ten
