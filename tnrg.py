@@ -7,6 +7,7 @@
 # Last Modified By  : Xinliang(Bruce) Lyu <lyu@issp.u-tokyo.ac.jp>
 
 import numpy as np
+from abeliantensors import TensorZ2
 from ncon import ncon
 from .initial_tensor import initial_tensor
 
@@ -222,15 +223,56 @@ class TensorNetworkRG3D(TensorNetworkRG):
         """
         return 0.5181489
 
-    def tm2x(self, number_tensors=2):
+    def tm2x(self, number_tensors=2, sparse=False, num_state=60,
+             fixed_field="spin"):
         """
         From the eigenvalues of the transfer matrix
         to scaling dimensions
         """
         self.generate_transfer_matrix(number_tensors=number_tensors)
-        # TODO
+        sph_tm = self.get_transfer_matrix()
+        if number_tensors == 2:
+            eig_val, eig_vec = sph_tm.eig([0, 1], [2, 3],
+                                          sparse=sparse,
+                                          chis=num_state)
+        elif number_tensors == 6:
+            eig_val, eig_vec = sph_tm.eig([0, 1, 2, 3, 4, 5],
+                                          [6, 7, 8, 9, 10, 11],
+                                          sparse=sparse,
+                                          chis=num_state)
+        else:
+            raise ValueError("The number_tensors can only be 2 or 6.")
+        # this is only for the numerical precision problem
+        eig_val = np.abs(eig_val)
+        if type(sph_tm) is TensorZ2:
+            # normalize the largest to 1 and take -log() transformation
+            log_ratio_even = -np.log(eig_val[(0,)] / eig_val[(0,)][0])
+            log_ratio_odd = -np.log(eig_val[(1,)] / eig_val[(0,)][0])
+            # determine the proportional constant
+            if fixed_field == "spin":
+                x_even = log_ratio_even / (
+                    log_ratio_odd[0]) * self.spin_scaling_dimension()
+                x_odd = log_ratio_odd / (
+                    log_ratio_odd[0]) * self.spin_scaling_dimension()
+            elif fixed_field == "stress-tensor":
+                x_even = log_ratio_even / (
+                    log_ratio_even[5]) * 3
+                x_odd = log_ratio_odd / (
+                    log_ratio_even[5]) * 3
+            else:
+                raise ValueError("fix_field is either spin or stress-tensor.")
+            log_ratio = [log_ratio_even, log_ratio_odd]
+            x = [x_even, x_odd]
+        else:
+            # normalize the largest to 1 and take -log() transformation
+            log_ratio = -np.log(eig_val / eig_val[0])
+            if fixed_field == "spin":
+                x = log_ratio / (
+                  log_ratio[1]) * self.spin_scaling_dimension()
+            else:
+                raise ValueError("fix_field should only be spin.")
 
-        return 0
+        return x, log_ratio
 
 
 
