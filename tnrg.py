@@ -175,7 +175,64 @@ class TensorNetworkRG2D(TensorNetworkRG):
 
 
 class TensorNetworkRG3D(TensorNetworkRG):
-    pass
+    """
+    TNRG for 3D cubic lattice
+    """
+    def two_tensors_sphere_tm(self):
+        """
+        Construct a transfer matrix using sphere
+        foliation by making a "pillow case" from
+        two tensors
+        """
+        ten_cur = self.get_tensor()
+        sphere_tm = ncon([ten_cur, ten_cur.conj()],
+                         [[1, 2, 3, 4, -3, -1],
+                          [1, 2, 3, 4, -4, -2]])
+        return sphere_tm
+
+    def six_tensors_sphere_tm(self):
+        """
+        Construct a transfer matrix using sphere
+        foliation by making a box from six tensors
+        """
+        ten_cur = self.get_tensor()
+        sphere_tm = ncon([ten_cur, ten_cur, ten_cur,
+                          ten_cur.conj(), ten_cur.conj(), ten_cur.conj()],
+                         [[1, 8, 2, 7, -7, -1], [9, 1, 3, 11, -8, -2],
+                         [10, 2, 12, 3, -9, -3], [9, 5, 10, 4, -10, -4],
+                         [5, 8, 12, 6, -11, -5], [4, 7, 6, 11, -12, -6]]
+                         )
+        return sphere_tm
+
+    def generate_transfer_matrix(self, number_tensors=2):
+        if number_tensors == 2:
+            self.sphere_tm = self.two_tensors_sphere_tm()
+        elif number_tensors == 6:
+            self.sphere_tm = self.six_tensors_sphere_tm()
+        else:
+            raise ValueError("The number_tensors can only be 2 or 6.")
+
+    def get_transfer_matrix(self):
+        return self.sphere_tm * 1.0
+
+    @staticmethod
+    def spin_scaling_dimension():
+        """
+        The best-known scaling dimension for the spin operator
+        """
+        return 0.5181489
+
+    def tm2x(self, number_tensors=2):
+        """
+        From the eigenvalues of the transfer matrix
+        to scaling dimensions
+        """
+        self.generate_transfer_matrix(number_tensors=number_tensors)
+        # TODO
+
+        return 0
+
+
 
 
 class HOTRG2D(TensorNetworkRG2D):
