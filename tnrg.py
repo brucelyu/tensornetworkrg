@@ -10,6 +10,7 @@ import numpy as np
 from abeliantensors import TensorZ2
 from ncon import ncon
 from .initial_tensor import initial_tensor
+from .coarse_grain_2d import trg_evenbly, tnr_evenbly
 
 
 class TensorNetworkRG:
