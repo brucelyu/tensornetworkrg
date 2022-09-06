@@ -44,6 +44,8 @@ class TensorNetworkRG:
         self.iter_n = 0
         self.current_tensor = None
         self.tensor_magnitude = []
+        self.isometry_applied = None
+        self.exact_free_energy = 0
 
     # fetch instance properties #
     # ------------------------- #
@@ -76,6 +78,23 @@ class TensorNetworkRG:
         return model parameters
         """
         return self.model_parameters.copy()
+
+    def get_exact_free_energy(self):
+        errmsg = "The model should be 2d Ising"
+        assert self.model == "ising2d", errmsg
+        import scipy.integrate as integrate
+        beta = 1 / self.model_parameters["temperature"]
+        k = 1 / (np.sinh(2 * beta)**2)
+        integrand = (
+            lambda theta: np.log((np.cosh(2 * beta))**2 +
+                                 1 / k * np.sqrt(1 + k**2-2*k*np.cos(2*theta))
+                                 )
+                     )
+        self.exact_free_energy = (np.log(2) / 2 +
+                                  1 / (2 * np.pi) * integrate.quad(integrand,
+                                                                   0, np.pi)[0]
+                                  )
+        return self.exact_free_energy
     # ------------------------- #
 
     # set model parameters #
@@ -111,6 +130,21 @@ class TensorNetworkRG:
                                   onsite_symmetry, scheme)
         self.tensor_magnitude.append(init_ten.norm())
         self.current_tensor = init_ten / init_ten.norm()
+        if self.model == "ising2d" and onsite_symmetry:
+            self.current_tensor.dirs = [1, 1, 1, 1]
+
+    # pull out tensor magnitude #
+    # ------------------------- #
+    def pullout_magnitude(self):
+        ten_mag = self.current_tensor.norm()
+        self.current_tensor = self.current_tensor / ten_mag
+        return ten_mag
+
+    def save_tensor_magnitude(self, ten_mag):
+        self.tensor_magnitude.append(ten_mag)
+        self.iter_n += 1
+        assert len(self.tensor_magnitude) == (self.iter_n + 1)
+    # ------------------------- #
 
 
 class TensorNetworkRG2D(TensorNetworkRG):
@@ -127,14 +161,29 @@ class TensorNetworkRG2D(TensorNetworkRG):
         ten_new = ncon([ten_cur]*4, [[-2, -3, 3, 1], [3, -4, -6, 2],
                                      [-1, 1, 4, -7], [4, 2, -5, -8]]
                        )
-        ten_new = ten_new.join_indices((0, 1), (2, 3), (4, 5), (6, 7))
+        ten_new = ten_new.join_indices((0, 1), (2, 3), (4, 5), (6, 7),
+                                       dirs=[1, 1, -1, -1])
         # truncate the leg a la hosvd
-        ten_new = self.truncate_hosvd(ten_new)
-        # pull out the tensor norm
-        self.tensor_magnitude.append(ten_new.norm())
-        self.current_tensor = ten_new / ten_new.norm()
-        self.iter_n += 1
-        assert len(self.tensor_magnitude) == (self.iter_n + 1)
+        self.current_tensor = self.truncate_hosvd(ten_new)
+        # pull out the tensor norm and save
+        ten_mag = self.pullout_magnitude()
+        self.save_tensor_magnitude(ten_mag)
+
+    def trg(self, pars={"chiM": 4, "chiH": 4, "chiV": 4, "dtol": 1e-16}):
+        ten_cur = self.get_tensor()
+        chiM = pars["chiM"]
+        chiH = pars["chiH"]
+        chiV = pars["chiV"]
+        dtol = pars["dtol"]
+        # block 4 tensors according to evenbly's implementation
+        (self.current_tensor,
+         q, v, w,
+         SPerr_list
+         ) = trg_evenbly.dotrg(ten_cur, chiM, chiH, chiV, dtol)
+        # pull out the tensor norm and save
+        ten_mag = self.pullout_magnitude()
+        self.save_tensor_magnitude(ten_mag)
+        self.isometry_applied = [v, w]
 
     @staticmethod
     def truncate_hosvd(ten):
@@ -174,6 +223,42 @@ class TensorNetworkRG2D(TensorNetworkRG):
         central_charge = np.log(eig_val[0]) * 6 / np.pi * aspect_ratio
         scaling_dimensions = -np.log(eig_val/eig_val[0])/(2*np.pi)*aspect_ratio
         return central_charge, scaling_dimensions
+
+    def eval_free_energy(self, initial_spin=2, b=2):
+        """
+        See my jupyter notebook on evently's trg
+        for how to calculate the free energy
+
+        initial_spin: int
+            number of spins that the initial tensor corresponds to
+        b: int
+            ratio between the coarse lattice length and the length
+            before RG.
+            A coarser tensor corresponds to b^2 tensors before a RG step.
+        """
+        messg = "iter_n should be length of the tensor magnitute list plus 1"
+        assert len(self.tensor_magnitude) == (self.iter_n + 1), messg
+        # calculate free energy divided by the temperature
+        ten_cur = self.get_tensor()
+        ten_mag_arr = np.array(self.tensor_magnitude)
+        weight = (
+            (1 / initial_spin) *
+            (1 / b**2)**np.array(range(0, self.iter_n + 1))
+                  )
+        # all contributions from the tensor magnitute
+        g = (weight * np.log(ten_mag_arr)).sum()
+        # the contribution from the tracing off the final normalized tensor
+        # determine the proper gauge
+        v, w = self.isometry_applied.copy()
+        Hgauge = ncon([v, v], [[1, 2, -1], [2, 1, -2]])
+        Vgauge = ncon([w, w], [[1, 2, -1], [2, 1, -2]])
+        g += (
+            (1 / (initial_spin * b**(2 * self.iter_n))) *
+            np.log(ncon([ten_cur, Hgauge, Vgauge],
+                        [[1, 3, 2, 4], [1, 2], [3, 4]]))
+        )
+        g = -1 * g
+        return g
 
 
 class TensorNetworkRG3D(TensorNetworkRG):
