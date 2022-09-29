@@ -9,8 +9,10 @@
 customized method for abeliantensors
 maybe move to that package implementations eventually
 """
+import functools
 from ncon import ncon
 import numpy as np
+from abeliantensors import Tensor, TensorCommon
 
 
 def pinv(B, a=[0, 1], b=[2, 3], eps_mach=1e-10, debug=False):
@@ -57,8 +59,119 @@ def pinv(B, a=[0, 1], b=[2, 3], eps_mach=1e-10, debug=False):
     return Binv
 
 
+def slicing(t, slc, indexOrder=None):
+    """
+    The common method for both the ordinary numpy Tensor
+    and the symmetric tensor
+
+    Args:
+    ------
+    t (Tensor or AbelianTensor): tensor to be sliced
+    slc (tuple): slc[k] is a `slice` object for k-th leg
+    indexOrder (tuple):
+        indexOrder[k] is an 1-leg tensor (usually singular value
+        or eigenvalue spectrum) specifying the importance of
+        different index values of the k-th leg
+
+    Returns:
+    ------
+    tslc (Tensor or AbelianTensor): tensor after slicing
+    """
+    # check input
+    msg = "t should be either Tensor or AbelianTensor."
+    assert issubclass(type(t), TensorCommon), msg
+    if indexOrder is not None:
+        msg = ("`slc` and `indexOrder` should both have" +
+               "length equal to the number of leg of `t`")
+        assert len(slc) == len(indexOrder), msg
+    # slicing the tensor
+    if type(t) is Tensor:
+        tslc = t[slc]
+    else:
+        # for the case of AbelianTensor
+        # First determine the slc according to indexOrder
+        slc = slcu1(slc, indexOrder)
+        # Then do the slice
+        tslc = sliceten(t, slc)
+    return tslc
+
+
+def slcu1(slc, indexOrder):
+    """
+    Split the sliced bond dimensions in `slc` among charge sectors
+    according to `indexOrder`
+
+    Args:
+    ------
+    t (Tensor or AbelianTensor): tensor to be sliced
+    slc (tuple): slc[k] is a `slice` object for k-th leg
+    indexOrder (tuple):
+        indexOrder[k] is an 1-leg tensor (usually singular value
+        or eigenvalue spectrum) specifying the importance of
+        different index values of the k-th leg
+
+    Careful! I only implement for the cases where slc[k] is
+          - slice(None)
+          - slice(chi)
+
+    Returns:
+    ------
+    slcnew (tuple):
+        - slcnew[k] is a list specifying the slicing of the `k`-th leg
+        - slcnew[k][c] is a `slice` object for slicing in charge-sector `c`
+    """
+    slcNew = []
+    for legslc, s in zip(slc, indexOrder):
+        if legslc == slice(None):
+            legslcNew = [slice(None)] * len(s.shape[0])
+        elif (legslc.start) is None and (legslc.step is None):
+            chi = legslc.stop
+            # vectorize the index to charge function
+            vecindArr2SymCharge = functools.partial(indArr2SymCharge,
+                                                    s.shape[0], s.qhape[0])
+            vecindArr2SymCharge = np.vectorize(vecindArr2SymCharge)
+            retainCharge = vecindArr2SymCharge(
+                (-1*s.to_ndarray()).argsort()
+            )[:chi]
+            # initialize
+            legslcNew = [0] * len(s.shape[0])
+            # determine the slice for each charge sector
+            for curCharge in s.qhape[0]:
+                chiCharge = (retainCharge == curCharge).sum()
+                legslcNew[curCharge] = slice(chiCharge)
+        else:
+            raise NotImplementedError
+        slcNew.append(legslcNew)
+
+    slcNew = tuple(slcNew)
+    return slcNew
+
+
+def indArr2SymCharge(legdim, qdim, arrind):
+    """
+    Convert a array index to its charge
+
+    Example: Suppose we have
+        legdim = [n0, n1, n2], qdim = [0, 1, 2];
+        if arrind is in [0, n0), resturn 0;
+        if arrind is in [n0, n0 + n1), return 1;
+        if arrind is in [n0+n1, n0+n1+n2), return 2;
+        else return None
+    """
+    startNum = 0
+    res = None
+    for nk, k in zip(legdim, qdim):
+        endNum = startNum + nk
+        if (arrind >= startNum) and (arrind < endNum):
+            res = k
+        startNum = endNum
+    return res
+
+
 def sliceten(t, slc):
     """slice a U(1)-tensor
+    This is specifically for symmetric tensor class
+    organized according to charge sectors.
 
     Args:
     ------
