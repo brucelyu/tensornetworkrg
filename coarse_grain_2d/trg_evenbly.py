@@ -87,7 +87,8 @@ def construct_q_env(Ain):
     return env_q
 
 
-def opt_q(Ain, chiM, dtol=1e-10):
+def opt_q(Ain, chiM, dtol=1e-10,
+          return_d=False):
     """determine a good 3-leg isometry q
 
     :Ain: abeliantensors
@@ -114,6 +115,8 @@ def opt_q(Ain, chiM, dtol=1e-10):
                    chis=[i+1 for i in range(chiM)],
                    trunc_err_func=trunc_err_func,
                    eps=dtol, return_rel_err=True)
+    if return_d:
+        return q, d, SPerr
     return q, SPerr
 
 
