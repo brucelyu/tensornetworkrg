@@ -7,7 +7,7 @@
 # Last Modified By  : Xinliang(Bruce) Lyu <lyu@issp.u-tokyo.ac.jp>
 
 import numpy as np
-from abeliantensors import TensorZ2
+from abeliantensors import TensorZ2, Tensor
 from ncon import ncon
 from .initial_tensor import initial_tensor
 from .coarse_grain_2d import trg_evenbly, tnr_evenbly
@@ -184,6 +184,55 @@ class TensorNetworkRG2D(TensorNetworkRG):
         ten_mag = self.pullout_magnitude()
         self.save_tensor_magnitude(ten_mag)
         self.isometry_applied = [v, w]
+
+    def tnr(self, pars={"chiM": 4, "chiH": 4, "chiV": 4, "dtol": 1e-16,
+                        "chiS": 4, "chiU": 4,
+                        "disiter": 2000, "miniter": 100, "convtol": 0.01,
+                        "is_display": True}):
+        if self.iter_n == 0:
+            self.init_dw()
+        ten_cur = self.get_tensor()
+        d_w_prev = self.d_w * 1.0
+        chiM = pars["chiM"]
+        chiH = pars["chiH"]
+        chiV = pars["chiV"]
+        chiS = pars["chiS"]
+        chiU = pars["chiU"]
+        dtol = pars["dtol"]
+        disiter = pars["disiter"]
+        miniter = pars["miniter"]
+        convtol = pars["convtol"]
+        is_display = pars["is_display"]
+        (self.current_tensor,
+         q, s, u, y, v, w,
+         SPerr_list,
+         self.d_w
+         ) = tnr_evenbly.dotnr(ten_cur, chiM, chiS, chiU,
+                               chiH, chiV, dtol, d_w_prev,
+                               disiter, miniter, convtol,
+                               is_display)
+        # pull out the tensor norm and save
+        ten_mag = self.pullout_magnitude()
+        self.save_tensor_magnitude(ten_mag)
+        self.isometry_applied = [v, w]
+
+    def init_dw(self):
+        ten_cur = self.get_tensor()
+        if type(ten_cur) is Tensor:
+            # for ordinary tensor
+            self.d_w = None
+        else:
+            # for AbelianTensor
+            vlegshape = ten_cur.shape[1]
+            d_w = ten_cur.eye(vlegshape).diag()
+            num = len(d_w)
+            for charge in d_w.qhape[0]:
+                chargeSect = []
+                for k in range(len(d_w[(charge,)])):
+                    chargeSect.append(num)
+                    num = num - 1
+                d_w[(charge,)] = chargeSect.copy()
+            self.d_w = d_w * 1.0
 
     @staticmethod
     def truncate_hosvd(ten):
