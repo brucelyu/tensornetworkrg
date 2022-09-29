@@ -14,7 +14,7 @@ from .trg_evenbly import (opt_q, build_qstarA,
                           )
 
 
-def dotnr(Ain, chiM, chiS, chiU, chiH, chiV, dtol=1e-16,
+def dotnr(Ain, chiM, chiS, chiU, chiH, chiV, dtol=1e-16, d_w=None,
           disiter=2000, miniter=100, convtol=0.01, is_display=True):
     """
     Block 4 tensors into 1 coarser tensor according to
@@ -39,6 +39,9 @@ def dotnr(Ain, chiM, chiS, chiU, chiH, chiV, dtol=1e-16,
     Below are additional parameters for the disentangling
     process making tnr different from trg
     ---
+    d_w: TensorComman
+        eigenvalue spectrum for previous horizontal squeezzing w
+        for specifying the index order of the vertical leg of Ain
     chiS, chiU: integer
         - bond dimensions for two furthur-squeezely legs,
         used to drive the fixed-point away from CDL tensors
@@ -56,27 +59,29 @@ def dotnr(Ain, chiM, chiS, chiU, chiH, chiV, dtol=1e-16,
             Ain.norm() < 1e-10), err_messg
     # The first step is exactly the same as
     # the evenbly's trg implementation (see the import line)
-    q, SPerrq = opt_q(Ain, chiM, dtol=dtol)
+    q, d_q, SPerrq = opt_q(Ain, chiM, dtol=dtol,
+                           return_d=True)
     # disentangling process, the key of tnr
     (s,
      y,
      u,
      SPerr_disent
-     ) = opt_syu(Ain, q, chiS, chiU,
+     ) = opt_syu(Ain, q, chiS, chiU, [d_q, d_w],
                  disiter, miniter, convtol,
                  dtol, is_display)
     # the final two step is similar to the trg
     # or the hotrg
     v, SPerrv = opt_v(Ain, q, s, y, chiH, dtol=dtol)
-    w, SPerrw = opt_w(Ain, q, s, y, chiV, dtol=dtol)
+    w, d_w, SPerrw = opt_w(Ain, q, s, y, chiV, dtol=dtol,
+                           return_d=True)
     # block four input A tensors and other squeezing tensors
     Aout = block_4tensor(Ain, q, s, y, v, w)
     SPerr_list = [SPerrq, SPerr_disent, SPerrv, SPerrw]
-    return Aout, q, s, u, y, v, w, SPerr_list
+    return Aout, q, s, u, y, v, w, SPerr_list, d_w
 
 
 # ====== Crucial part: disentangling ======== |v|
-def opt_syu(Ain, q, chiS, chiU,
+def opt_syu(Ain, q, chiS, chiU, orderArr,
             disiter=2000, miniter=100, convtol=0.01,
             dtol=1e-10, is_display=True):
     """Iteratively determine unitary u, isometric y
@@ -118,7 +123,7 @@ def opt_syu(Ain, q, chiS, chiU,
 
     SPerr = 1
     # initialize s, y, u
-    s, y, u = init_syu(Ain, q, chiS, chiU)
+    s, y, u = init_syu(Ain, q, chiS, chiU, orderArr=orderArr)
     # update s, y, u iteratively
     for k in range(disiter + 1):
         # -- This first part is for printing out -------- #
@@ -165,24 +170,44 @@ def opt_syu(Ain, q, chiS, chiU,
     s = s / (phi2psi)**(1/8)
     return s, y, u, SPerr
 
-# TODO
-def init_syu(Ain, q, chiS, chiU):
+
+def init_syu(Ain, q, chiS, chiU,
+             orderArr=None):
     """
     A good way to initialize s, y, u
+
+    orderArr: list
+        [sq, sw] specifying the order of slicing
+        - sq is the spectrum corresponding
+        to the 3-leg q,
+        - sw is the spectrum corresponding
+        to the 3-leg w.
+
     """
-    # TODO: `sliceten` to be implemented
     # the initial unitary u is
     # a direct product of two identity matrices
-    # u = np.kron(np.eye(chiVI, chiU), np.eye(chiVI, chiU)).reshape(chiVI,chiVI,chiU,chiU)
-    eye4u = Ain.eye()
-    u = ncon([eye4u, eye4u], [[-1, -3], [-2, -3]])
+    # u = np.kron(np.eye(chiVI, chiU),
+    #             np.eye(chiVI, chiU)).reshape(chiVI,chiVI,chiU,chiU)
+    # The order of the slicing chiU is specified by the order of
+    # the verticle leg of input tensor, specified by `sw`
+    # with bond dimension chiVI
+    sq, sw = orderArr
+    eye4u = Ain.eye(Ain.shape[1])
+    eye4u = u1ten.slicing(eye4u, (slice(None), slice(chiU)),
+                          indexOrder=(sw, sw))
+    u = ncon([eye4u, eye4u], [[-1, -3], [-2, -4]])
     # the initial isometry y is taken from q
     # y = q[:, :u.shape[2], :chiS]
-    y = sliceten(q, posleg=1, legrange=None)
-    y = sliceten(y, posleg=2, legrange=None)
+    # The order of the slicing chiS is specified
+    # by the order of the third leg of q
+    # `eyeq0` this is just a placeholder for indexOrder
+    eyeq0 = q.eye(q.shape[0]).diag()
+    y = u1ten.slicing(q, (slice(None), slice(chiU), slice(chiS)),
+                      indexOrder=(eyeq0, sw, sq))
     # the initial matrix s is identity matrix
     s = q.eye(q.shape[2])
-    s = sliceten(s, posleg=1, legrange=None)
+    s = u1ten.slicing(s, (slice(None), slice(chiS)),
+                      indexOrder=(sq, sq))
     return s, y, u
 
 
@@ -397,7 +422,8 @@ def opt_v(Ain, q, s, y, chiH, dtol=1e-10):
     return v, SPerr
 
 
-def opt_w(Ain, q, s, y, chiV, dtol=1e-10):
+def opt_w(Ain, q, s, y, chiV, dtol=1e-10,
+          return_d=False):
     """determine a good 3-leg isometry w
     w is for squeezing legs in horizontal direction
     to produce a vertical coarser leg
@@ -437,6 +463,8 @@ def opt_w(Ain, q, s, y, chiV, dtol=1e-10):
                    chis=[i+1 for i in range(chiV)],
                    trunc_err_func=trunc_err_func,
                    eps=dtol, return_rel_err=True)
+    if return_d:
+        return w, d, SPerr
     return w, SPerr
 
 
