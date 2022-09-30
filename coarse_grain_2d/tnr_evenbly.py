@@ -192,24 +192,38 @@ def init_syu(Ain, q, chiS, chiU,
     # the verticle leg of input tensor, specified by `sw`
     # with bond dimension chiVI
     sq, sw = orderArr
-    eye4u = Ain.eye(Ain.shape[1])
+    eye4u = eyelike(Ain, 1)
     eye4u = u1ten.slicing(eye4u, (slice(None), slice(chiU)),
                           indexOrder=(sw, sw))
-    u = ncon([eye4u, eye4u], [[-1, -3], [-2, -4]])
+    u = ncon([eye4u.conjugate(), eye4u],
+             [[-1, -3], [-2, -4]])
     # the initial isometry y is taken from q
     # y = q[:, :u.shape[2], :chiS]
     # The order of the slicing chiS is specified
     # by the order of the third leg of q
     # `eyeq0` this is just a placeholder for indexOrder
-    eyeq0 = q.eye(q.shape[0]).diag()
+    eyeq0 = eyelike(q, 0).diag()
     y = u1ten.slicing(q, (slice(None), slice(chiU), slice(chiS)),
                       indexOrder=(eyeq0, sw, sq))
     # the initial matrix s is identity matrix
-    s = q.eye(q.shape[2])
+    s = eyelike(q, 2)
     s = u1ten.slicing(s, (slice(None), slice(chiS)),
                       indexOrder=(sq, sq))
     return s, y, u
 
+
+def eyelike(ten, legk):
+    """
+    identity matrix corresponding to leg of ten
+    """
+    if ten.qhape is None:
+        # Tensor
+        qim = None
+    else:
+        # AbelianTensor
+        qim = ten.qhape[legk]
+    eyeres = ten.eye(ten.shape[legk], qim=qim)
+    return eyeres
 
 # for updating the s matrix
 # function for updating s, y, u
@@ -474,6 +488,10 @@ def block_4tensor(Ain, q, s, y, v, w):
     - isometry q is for reducing computational cost
     - isometry y and matrix s comes from distengling process
 
+    Basically similar to Evenbly's TRG implementation
+    just replace sq -> q
+                 y  -> another q
+
     :Ain: abeliantensors
         4-leg input tensor
     :q: abeliantensors
@@ -496,5 +514,17 @@ def block_4tensor(Ain, q, s, y, v, w):
     Aout: abeliantensors
         4-leg output tensor
     """
-    pass
+    sq = build_sq(q, s)
+    # this is similar to qstarA in Evenbly's TRG
+    sqstarA = build_qstarA(sq, Ain)
+    sqB = sqstarA.conjugate()
+    vsqA = ncon([v.conjugate(), sqstarA, sqB],
+                [[2, 3, -3], [1, 2, -1], [1, 3, -2]])
+    wy = ncon([w.conjugate(), y.conjugate(), y],
+              [[2, 3, -3], [1, 2, -1], [1, 3, -2]])
+    Aout = ncon([vsqA, wy, vsqA, wy],
+                [[3, 1, -1], [1, 4, -2],
+                 [4, 2, -3], [2, 3, -4]])
+    return Aout
+
 # ====== End of the easy part =========== |^|
