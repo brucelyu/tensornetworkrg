@@ -192,7 +192,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
         if self.iter_n == 0:
             self.init_dw()
         ten_cur = self.get_tensor()
-        d_w_prev = self.d_w * 1.0
+        d_w_prev = self.d_w
         chiM = pars["chiM"]
         chiH = pars["chiH"]
         chiV = pars["chiV"]
@@ -231,7 +231,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
                 for k in range(len(d_w[(charge,)])):
                     chargeSect.append(num)
                     num = num - 1
-                d_w[(charge,)] = chargeSect.copy()
+                d_w[(charge,)] = np.array(chargeSect)
             self.d_w = d_w * 1.0
 
     @staticmethod
@@ -306,7 +306,6 @@ class TensorNetworkRG2D(TensorNetworkRG):
             np.log(ncon([ten_cur, Hgauge, Vgauge],
                         [[1, 3, 2, 4], [1, 2], [3, 4]]))
         )
-        g = -1 * g
         return g
 
 
