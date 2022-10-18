@@ -235,12 +235,12 @@ class TensorNetworkRG2D(TensorNetworkRG):
             self.d_w = d_w * 1.0
 
     @staticmethod
-    def truncate_hosvd(ten):
+    def truncate_hosvd(ten, dtol=1e-8):
         """
         truncate a la hosvd
         """
-        proj_x = ten.svd([0], [1, 2, 3], eps=1e-15)[0]
-        proj_y = ten.svd([1], [2, 3, 0], eps=1e-15)[0]
+        proj_x = ten.svd([0], [1, 2, 3], eps=dtol)[0]
+        proj_y = ten.svd([1], [2, 3, 0], eps=dtol)[0]
         ten_new = ncon([ten, proj_x.conjugate(), proj_x,
                         proj_y.conjugate(), proj_y],
                        [[1, 2, 3, 4], [1, -1], [3, -3],
