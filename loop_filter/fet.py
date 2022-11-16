@@ -45,7 +45,7 @@ def findLR(Gamma, epsilon=1e-13):
 
 
 def findMats(Gamma, chis, epsilon=1e-13, iter_max=20,
-             display=False):
+             epsilon_init=1e-16, display=False):
     """determine half the piece of the low-rank matrix,
     given the bond environment and the squeezed bond dimension
     This is a iterative method, similar to GILTs's recursive approach,
@@ -63,12 +63,13 @@ def findMats(Gamma, chis, epsilon=1e-13, iter_max=20,
         s (TensorCommon): the half piece of the low-rank matrix
 
     """
-    # initialize s
-    s = Gamma.eye(Gamma.shape[0])
-    # TODO: take care of the u1-tensor slicing later
-    # by specifying the indexOrder Array
+    # initialize s matrix using the baby version FET
+    # s = Gamma.eye(Gamma.shape[0])
+    lr = findLR(Gamma, epsilon=epsilon_init)
+    # split lr to find s
+    s, ds = lr.split([0], [1], return_sings=True)[:2]
     s = u1ten.slicing(s, (slice(None), slice(chis)),
-                      indexOrder=None)
+                      indexOrder=(ds, ds))
     # approximation metric
     # 1. fidelity and 1 - fidelity
     lr = s2lr(s)
@@ -105,7 +106,7 @@ def findMats(Gamma, chis, epsilon=1e-13, iter_max=20,
 
 
 def optMats(Gamma_h, chis, epsilon=1e-13, iter_max=20,
-            display=False):
+            epsilon_init=1e-16, display=False):
     """determine the half piece of the low-rank matrix
     This scheme preserves the reflection symmetry of the plaquette
     environment in both directions.
@@ -123,12 +124,15 @@ def optMats(Gamma_h, chis, epsilon=1e-13, iter_max=20,
         s (TensorCommon): the half piece of the low-rank matrix
 
     """
-    # initialize s
-    s = Gamma_h.eye(Gamma_h.shape[0])
-    # TODO: take care of the u1-tensor slicing later
-    # by specifying the indexOrder Array
+    # initialize s matrix using the baby version FET
+    # s = Gamma_h.eye(Gamma_h.shape[0])
+    GammaBaby = ncon([Gamma_h, Gamma_h.conj()],
+                     [[-1, -3, 1, 2], [-2, -4, 1, 2]])
+    lr = findLR(GammaBaby, epsilon=epsilon_init)
+    # split lr to find s
+    s, ds = lr.split([0], [1], return_sings=True)[:2]
     s = u1ten.slicing(s, (slice(None), slice(chis)),
-                      indexOrder=None)
+                      indexOrder=(ds, ds))
     # approximation metric
     # 1. fidelity and 1 - fidelity
     f, err = fidelity2leg(Gamma_h, s)[:2]
