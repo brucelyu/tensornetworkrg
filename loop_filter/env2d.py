@@ -12,6 +12,49 @@ import numpy as np
 from ncon import ncon
 
 
+def envHalfRefSym(A):
+    """2-leg reflection symmetric environment
+    This environment goes beyond the GILT framework,
+    where only a single leg is cut at a time.
+    We move to the FET framework here.
+
+    The environment here is roughly half of the GILT environment,
+    consisting of 4 copies of A tensor.
+    It is designed for cutting two legs in a plaquette at the same time,
+    so the reflection symmetry in two directions are imposed explicitly.
+      j|
+     i--A--k,
+       l|
+     and the plaquette looks like
+        |     |
+     ---A--Lr--Areflv--
+        |     |
+        |     |
+ --Areflh--Lr--Areflhv--
+        |     |
+
+    Args:
+        A (TensorCommon): 4-leg tensor
+
+    Returns:
+        Gamma_h (TensorCommon):
+            half environment tensor
+        /---|
+      /  ---A----
+     |  /   |
+     | | -Areflh--
+     | | |  |
+     | | ---A----
+     | |    |
+      \ \-Areflh--
+        \---|
+    """
+    Gamma_h = ncon([A, A.conj(), A.conj(), A],
+                   [[3, 4, -1, 5], [3, 4, -2, 6],
+                    [1, 2, -3, 5], [1, 2, -4, 6]])
+    return Gamma_h
+
+
 def envUs(legenv, eps=1e-14):
     """find U, s from the plaquette environment of a leg
 
