@@ -118,6 +118,8 @@ def optMats(Gamma_h, chis, epsilon=1e-13, iter_max=20,
     Kwargs:
         epsilon (float): for truncation during pseudoinverse
         iter_max (int): maximal iteration number
+        epsilon_init (float): for truncation during psedoinverse
+            during the first baby version FET
         display (boolean): print out information
 
     Returns:
@@ -258,14 +260,16 @@ def fidelity2leg(Gamma_h, s):
                   [[1, 2, 3, 4], [1, 2, 3, 4]])
     # fidelity
     f = psiphi * psiphi.conj() / (psipsi * phiphi)
+    f = f.norm()
     return f, 1 - f, psipsi, phiphi
 
 
 def entropy(lr):
     s = lr.svd([0], [1])[1]
+    s = s.to_ndarray()
     s = s / s.sum()
     s = s + 1e-15
-    ee = -(s * s.log()).sum()
+    ee = -(s * np.log(s)).sum()
     return ee
 
 
