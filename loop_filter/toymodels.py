@@ -10,7 +10,7 @@ Construct various toy models representing
 the short-range correlations in tensor network.
 """
 from ncon import ncon
-from abeliantensors import Tensor
+from abeliantensors import Tensor, TensorZ2
 
 
 def cdlten(cornerChi=2, isZ2=False):
@@ -37,12 +37,19 @@ def cdlten(cornerChi=2, isZ2=False):
     if not isZ2:
         cmat = Tensor.random([cornerChi]*2)
     else:
-        raise NotImplementedError("To be implemented...")
+        n = [cornerChi // 2, cornerChi - cornerChi // 2]
+        shape = [n] * 2
+        qhape = [[0, 1]] * 2
+        dirs = [1, -1]
+        cmat = TensorZ2.random(shape=shape, qhape=qhape, dirs=dirs)
     # make corner matrix symmetric
     cmat = 0.5 * (cmat + cmat.transpose().conj())
     # construct the CDL structure
-    cdl = ncon([cmat]*4,  [[-1, -3], [-5, -4], [-6, -8], [-2, -7]])
-    cdl = cdl.join_indices([0, 1], [2, 3], [4, 5], [6, 7])
+    cdl = ncon([cmat, cmat.conj(), cmat, cmat.conj()],
+               [[-1, -3], [-5, -4], [-6, -8], [-2, -7]])
+    cdl = cdl.join_indices([0, 1], [2, 3], [4, 5], [6, 7],
+                           dirs=[1, 1, -1, -1])
     # the loop represented by the CDL structure
-    loopNumber = ncon([cmat]*4, [[1, 2], [3, 2], [3, 4], [1, 4]])
+    loopNumber = ncon([cmat, cmat.conj(), cmat, cmat.conj()],
+                      [[1, 2], [3, 2], [3, 4], [1, 4]])
     return cdl, loopNumber, cmat
