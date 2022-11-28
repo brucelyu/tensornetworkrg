@@ -10,14 +10,15 @@ import numpy as np
 from abeliantensors import TensorZ2, Tensor
 from ncon import ncon
 from .initial_tensor import initial_tensor
-from .coarse_grain_2d import trg_evenbly, tnr_evenbly
+from .coarse_grain_2d import trg_evenbly, tnr_evenbly, hotrg
+from .loop_filter import cleanLoop, toymodels
 
 
 class TensorNetworkRG:
     """
     Tensor network renormalization group
     """
-    model_choice = ("ising2d", "ising3d", "golden chain")
+    model_choice = ("ising2d", "ising3d", "golden chain", "cdl2d")
     ising_models = ("ising2d", "ising3d")
 
     def __init__(self, model):
@@ -118,7 +119,8 @@ class TensorNetworkRG:
             self.model_parameters["temperature"] = 4.51152469
     # -------------------- #
 
-    def generate_initial_tensor(self, onsite_symmetry=False, scheme="simple"):
+    def generate_initial_tensor(self, onsite_symmetry=False, scheme="simple",
+                                init_dirs=[1, 1, 1, 1]):
         """
         generate the initial tensor corresponding to the model
         `model_parameters`: dictionary
@@ -131,7 +133,14 @@ class TensorNetworkRG:
         self.tensor_magnitude.append(init_ten.norm())
         self.current_tensor = init_ten / init_ten.norm()
         if self.model == "ising2d" and onsite_symmetry:
-            self.current_tensor.dirs = [1, 1, 1, 1]
+            self.current_tensor.dirs = init_dirs
+
+    def generate_cdl(self, cornerChi=2, isZ2=False):
+        cdl, loop, cmat = toymodels.cdlten(cornerChi, isZ2)
+        self.tensor_magnitude.append(cdl.norm())
+        self.current_tensor = cdl / cdl.norm()
+        self.loop = loop
+        self.cmat = cmat
 
     # pull out tensor magnitude #
     # ------------------------- #
@@ -170,6 +179,9 @@ class TensorNetworkRG2D(TensorNetworkRG):
         self.save_tensor_magnitude(ten_mag)
 
     def trg(self, pars={"chiM": 4, "chiH": 4, "chiV": 4, "dtol": 1e-16}):
+        if self.iter_n == 0:
+            self.init_dw()
+            self.boundary = "anti-parallel"
         ten_cur = self.get_tensor()
         chiM = pars["chiM"]
         chiH = pars["chiH"]
@@ -191,6 +203,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
                         "is_display": True}):
         if self.iter_n == 0:
             self.init_dw()
+            self.boundary = "anti-parallel"
         ten_cur = self.get_tensor()
         d_w_prev = self.d_w
         chiM = pars["chiM"]
@@ -215,6 +228,54 @@ class TensorNetworkRG2D(TensorNetworkRG):
         ten_mag = self.pullout_magnitude()
         self.save_tensor_magnitude(ten_mag)
         self.isometry_applied = [v, w]
+
+    def fet_hotrg(
+        self,
+        pars={"chi": 4, "dtol": 1e-16,
+              "chis": None, "iter_max": 10,
+              "epsilon": 1e-10, "epsilon_init": 1e-10,
+              "bothSides": True, "display": True
+              }
+    ):
+        if self.iter_n == 0:
+            self.boundary = "parallel"
+        ten_cur = self.get_tensor()
+        chi = pars["chi"]
+        dtol = pars["dtol"]
+        chis = pars["chis"]
+        iter_max = pars["iter_max"]
+        epsilon = pars["epsilon"]
+        epsilon_init = pars["epsilon_init"]
+        bothSides = pars["bothSides"]
+        display = pars["display"]
+        # first apply the FET
+        (Alf,
+         s,
+         errFET
+         ) = cleanLoop.fet2dReflSym(ten_cur, chis, epsilon, iter_max,
+                                    epsilon_init, bothSides=bothSides,
+                                    display=False)
+        if display:
+            print("FET error (or rather 1 - fidelity)",
+                  "is {:.4e}.".format(np.abs(errFET)))
+            print("----------")
+        # then use hotrg to coarse graining
+        (self.current_tensor,
+         v, w, vin,
+         SPerrList
+         ) = hotrg.reflSymHOTRG(Alf, chi, dtol,
+                                horiSym=bothSides)
+        if display:
+            print("The two outer projection errors are")
+            print("Vertical: {:.4e}".format(SPerrList[0]))
+            print("Horizontal: {:.4e}".format(SPerrList[1]))
+            print("The inner projection error is")
+            print("{:.4e}".format(SPerrList[2]))
+            print("----------")
+        # pull out the tensor norm and save
+        ten_mag = self.pullout_magnitude()
+        self.save_tensor_magnitude(ten_mag)
+
 
     def init_dw(self):
         ten_cur = self.get_tensor()
@@ -298,14 +359,23 @@ class TensorNetworkRG2D(TensorNetworkRG):
         g = (weight * np.log(ten_mag_arr)).sum()
         # the contribution from the tracing off the final normalized tensor
         # determine the proper gauge
-        v, w = self.isometry_applied.copy()
-        Hgauge = ncon([v, v], [[1, 2, -1], [2, 1, -2]])
-        Vgauge = ncon([w, w], [[1, 2, -1], [2, 1, -2]])
-        g += (
-            (1 / (initial_spin * b**(2 * self.iter_n))) *
-            np.log(ncon([ten_cur, Hgauge, Vgauge],
-                        [[1, 3, 2, 4], [1, 2], [3, 4]]))
-        )
+        if self.boundary == "anti-parallel":
+            # we need to take care of
+            # the gauge matrices on bonds
+            v, w = self.isometry_applied.copy()
+            Hgauge = ncon([v, v], [[1, 2, -1], [2, 1, -2]])
+            Vgauge = ncon([w, w], [[1, 2, -1], [2, 1, -2]])
+            g += (
+                (1 / (initial_spin * b**(2 * self.iter_n))) *
+                np.log(ncon([ten_cur, Hgauge, Vgauge],
+                            [[1, 3, 2, 4], [1, 2], [3, 4]]))
+            )
+        elif self.boundary == "parallel":
+            # the gauge matrices on bonds is trivial
+            g += (
+                (1 / (initial_spin * b**(2 * self.iter_n))) *
+                np.log(ncon([ten_cur], [[1, 2, 1, 2]]))
+            )
         return g
 
 
