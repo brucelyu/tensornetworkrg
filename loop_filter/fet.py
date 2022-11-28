@@ -146,34 +146,31 @@ def optMats(Gamma_h, chis, epsilon=1e-13, iter_max=20,
         print("The initial entropy for",
               "the low-rank matrix is {:.4f}".format(ee))
         print("The spectrum of the low-rank matrix is")
-        print(s.svd([0], [1])[1])
+        s_darr = s.svd([0], [1])[1].to_ndarray()
+        s_darr = -np.sort(-s_darr)
+        print(s_darr)
     # enter the iteration
     for k in range(iter_max):
         # update s
-        Gamma_hss = ncon([Gamma_h, s.conj(), s],
-                         [[-1, -2, 1, 2], [1, -3], [2, -4]])
-        Gammas = ncon([Gamma_hss, Gamma_hss.conj(), s.conj(), s],
-                      [[-1, -3, 3, 4], [1, 2, 3, 4], [1, -2], [2, -4]])
-        Gamma_hs = ncon([Gamma_h, s], [[-1, -2, -3, 1], [1, -4]])
-        Ps = ncon([Gamma_hs, Gamma_hs.conj(), s],
-                  [[1, -1, 3, 4], [1, 2, 3, 4], [2, -2]])
-        s = updateMats(Gammas, Ps, epsilon=epsilon)
+        s = LinUpdateMats(Gamma_h, s, epsilon)
         # hosvd-like truncating right leg of s
         proj_s = s.svd([1], [0], eps=epsilon*100)[0]
         s = ncon([s, proj_s.conj()], [[-1, 1], [1, -2]])
         # approximation metric
         # 1. fidelity and 1 - fidelity
-        f, err = fidelity2leg(Gamma_h, s)[:2]
+        f, errNew = fidelity2leg(Gamma_h, s)[:2]
         # 2. entanglement entropy
         lr = s2lr(s)
         ee = entropy(lr)
         if display:
             print("This is the {:d}-th iteration".format(k))
-            print("The 1 - fidelity is {:.4e}".format(err))
+            print("The 1 - fidelity is {:.4e}".format(errNew))
             print("The entropy for",
                   "the low-rank matrix is {:.4f}".format(ee))
             print("The spectrum of the low-rank matrix is")
-            print(s.svd([0], [1])[1])
+            s_darr = s.svd([0], [1])[1].to_ndarray()
+            s_darr = -np.sort(-s_darr)
+            print(s_darr)
         if chis is None:
             # for a GILT-like procedure
             # stop the iteration when we get a projector
@@ -181,6 +178,15 @@ def optMats(Gamma_h, chis, epsilon=1e-13, iter_max=20,
             chisCur = s.flatten_shape(s.shape)[1]
             if np.abs(chisCur - chisShould) < 1e-2:
                 break
+        else:
+            # for an FET-like procedure, where
+            # a preference `chis` is specified
+            if k > 5:
+                errDelta = np.abs(errNew - err) / np.abs(err)
+                if (np.abs(errNew) < epsilon) or (errDelta < 1e-2):
+                    err = errNew
+                    break
+        err = errNew
     # Since the optimization uses fidelity as the cost function,
     # the overall magnetitute of the tensor is not determined.
     # (this is like using minimizing the angle between two vectors)
@@ -190,6 +196,45 @@ def optMats(Gamma_h, chis, epsilon=1e-13, iter_max=20,
     psi2phi = (psipsi / phiphi).norm()
     s = s * (psi2phi)**(1/8)
     return s
+
+
+def LinUpdateMats(Gamma_h, s, epsilon):
+    """update s by linearizing the environment
+    Here we follow a trick inspired by Evenbly's
+    implementation of TNR in his tensors.net webpage.
+
+    Args:
+        Gamma_h (TensorCommon): half environment tensor
+        s (TensorCommon): old half low-rank matrix
+            lr = s @ s*.T
+
+    Returns:
+        sM (TensorCommon): new half low-rank matrix
+
+    """
+    # old approximation error
+    f, errOld = fidelity2leg(Gamma_h, s)[:2]
+    # propose a candidatet s by convert the problem
+    # into a generalized eigenvalue problem
+    Gamma_hss = ncon([Gamma_h, s.conj(), s],
+                     [[-1, -2, 1, 2], [1, -3], [2, -4]])
+    Gammas = ncon([Gamma_hss, Gamma_hss.conj(), s.conj(), s],
+                  [[-1, -3, 3, 4], [1, 2, 3, 4], [1, -2], [2, -4]])
+    Gamma_hs = ncon([Gamma_h, s], [[-1, -2, -3, 1], [1, -4]])
+    Ps = ncon([Gamma_hs, Gamma_hs.conj(), s],
+              [[1, -1, 3, 4], [1, 2, 3, 4], [2, -2]])
+    stemp = updateMats(Gammas, Ps, epsilon=epsilon)
+    # normalized stemp
+    stemp = stemp / stemp.norm()
+    # try all the convex combination of old s and new s
+    # make sure the approximation error go down
+    for p in range(11):
+        snew = (1 - 0.1*p) * stemp + 0.1 * p * s
+        f, errNew = fidelity2leg(Gamma_h, snew)[:2]
+        if (errNew <= errOld) or (errNew < epsilon):
+            sM = snew / snew.norm()
+            break
+    return sM
 
 
 def updateMats(Gammas, Ps, epsilon=1e-13):
