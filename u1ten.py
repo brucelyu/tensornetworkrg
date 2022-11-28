@@ -118,7 +118,8 @@ def slcu1(slc, indexOrder):
     ------
     slcnew (tuple):
         - slcnew[k] is a list specifying the slicing of the `k`-th leg
-        - slcnew[k][c] is a `slice` object for slicing in charge-sector `c`
+        - slcnew[k][c] is a `slice` object for slicing
+        in charge-sector `indexOrder[k].qhape[0][c]`
     """
     slcNew = []
     for legslc, s in zip(slc, indexOrder):
@@ -134,11 +135,12 @@ def slcu1(slc, indexOrder):
                 (-1*s.to_ndarray()).argsort()
             )[:chi]
             # initialize
-            legslcNew = [0] * len(s.shape[0])
+            legslcNew = []
             # determine the slice for each charge sector
-            for curCharge in s.qhape[0]:
+            for c in range(len(s.shape[0])):
+                curCharge = s.qhape[0][c]
                 chiCharge = (retainCharge == curCharge).sum()
-                legslcNew[curCharge] = slice(chiCharge)
+                legslcNew.append(slice(chiCharge))
         else:
             raise NotImplementedError
         slcNew.append(legslcNew)
@@ -157,10 +159,14 @@ def indArr2SymCharge(legdim, qdim, arrind):
         if arrind is in [n0, n0 + n1), return 1;
         if arrind is in [n0+n1, n0+n1+n2), return 2;
         else return None
+
+        Notice the order in qdim doesn't mater
+        since they will be sorted anyway.
     """
     startNum = 0
     res = None
-    for nk, k in zip(legdim, qdim):
+    qdimSort = sorted(qdim)
+    for nk, k in zip(legdim, qdimSort):
         endNum = startNum + nk
         if (arrind >= startNum) and (arrind < endNum):
             res = k
@@ -178,7 +184,8 @@ def sliceten(t, slc):
     t (abeliantensors): tensor to be sliced
     slc (tuple): slicing range
         - slc[k] is a list specifying the slicing of the `k`-th leg
-        - slc[k][c] is a `slice` object for slicing in charge-sector `c`
+        - slc[k][c] is a `slice` object for slicing
+        in charge-sector `t.qhape[k][c]` of k-th leg
 
     Returns:
     ------
@@ -205,8 +212,10 @@ def sliceten(t, slc):
     # Set the blocks of `tslc` from the old tensor `t`
     for chargeKey in t.sects:
         keySlc = []
-        for legSlc, legCharge in zip(slc, chargeKey):
-            keySlc.append(legSlc[legCharge])
+        for k, legSlcCharge in enumerate(zip(slc, chargeKey)):
+            legSlc, legCharge = legSlcCharge
+            chargeInd = tqhape[k].index(legCharge)
+            keySlc.append(legSlc[chargeInd])
         keySlc = tuple(keySlc)
         tslc[chargeKey] = t[chargeKey][keySlc]
     msg = ("The keys of the sectors of the sliced tensor " +
@@ -223,7 +232,8 @@ def tenSlcShape(t, slc):
     t (abeliantensors): tensor to be sliced
     slc (tuple): slicing range
         - slc[k] is a list specifying the slicing of the `k`-th leg
-        - slc[k][c] is a `slice` object for slicing in charge-sector `c`
+        - slc[k][c] is a `slice` object for slicing
+        in charge-sector `t.qhape[k][c]`
 
     Example Codes:
     ------
