@@ -107,7 +107,7 @@ def fet2dReflSym(A, chis, epsilon=1e-13, iter_max=20,
     Gamma_h = envHalfRefSym(Areflhv)
     # find s
     s = fet.optMats(Gamma_h, chis, epsilon=epsilon, iter_max=iter_max,
-                    epsilon_init=epsilon_init, display=False)
+                    epsilon_init=epsilon_init, display=True)
     # FET approximation error, or 1 - fidelity
     err = fet.fidelity2leg(Gamma_h, s)[1]
     if display:
