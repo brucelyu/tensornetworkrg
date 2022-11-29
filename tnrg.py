@@ -378,6 +378,16 @@ class TensorNetworkRG2D(TensorNetworkRG):
             )
         return g
 
+    def singlular_spectrum(self):
+        ten_cur = self.get_tensor()
+        s = ten_cur.svd([0, 1], [2, 3])[1]
+        s = s / s.max()
+        s = s.to_ndarray()
+        s = np.abs(s)
+        s = -np.sort(-s)
+        return s
+
+
 
 class TensorNetworkRG3D(TensorNetworkRG):
     """
