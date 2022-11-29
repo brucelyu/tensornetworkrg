@@ -162,7 +162,7 @@ def optMats(Gamma_h, chis, epsilon=1e-13, iter_max=20,
         # 2. entanglement entropy
         lr = s2lr(s)
         ee = entropy(lr)
-        if display:
+        if display and (np.mod(k+1, 5) == 0):
             print("This is the {:d}-th iteration".format(k))
             print("The 1 - fidelity is {:.4e}".format(errNew))
             print("The entropy for",
