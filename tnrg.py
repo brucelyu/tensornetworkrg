@@ -276,6 +276,34 @@ class TensorNetworkRG2D(TensorNetworkRG):
         ten_mag = self.pullout_magnitude()
         self.save_tensor_magnitude(ten_mag)
 
+    def hotrg(
+        self,
+        pars={"chi": 4, "dtol": 1e-16,
+              "display": True}
+    ):
+        if self.iter_n == 0:
+            self.boundary = "parallel"
+        # read hotrg parameters
+        chi = pars["chi"]
+        dtol = pars["dtol"]
+        display = pars["display"]
+        # use hotrg to coarse graining
+        ten_cur = self.get_tensor()
+        (self.current_tensor,
+         v, w, vin,
+         SPerrList
+         ) = hotrg.reflSymHOTRG(ten_cur, chi, dtol,
+                                horiSym=True)
+        if display:
+            print("The two outer projection errors are")
+            print("Vertical: {:.4e}".format(SPerrList[0]))
+            print("Horizontal: {:.4e}".format(SPerrList[1]))
+            print("The inner projection error is")
+            print("{:.4e}".format(SPerrList[2]))
+            print("----------")
+        # pull out the tensor norm and save
+        ten_mag = self.pullout_magnitude()
+        self.save_tensor_magnitude(ten_mag)
 
     def init_dw(self):
         ten_cur = self.get_tensor()
@@ -386,6 +414,22 @@ class TensorNetworkRG2D(TensorNetworkRG):
         s = np.abs(s)
         s = -np.sort(-s)
         return s
+
+    def ishermitian_tm(self):
+        # check whether the transfer matrix is hermitian or not
+        # If true, we gather an evidence that the individual tensor
+        # has refelction symmetry
+        ten_cur = self.get_tensor()
+        if self.boundary == "parallel":
+            tm_v = ncon([ten_cur], [[1, -1, 1, -2]])
+            tm_h = ncon([ten_cur], [[-1, 1, -2, 1]])
+        vsym = tm_v.allclose(
+            tm_v.transpose().conj()
+        )
+        hsym = tm_h.allclose(
+            tm_h.transpose().conj()
+        )
+        return vsym, hsym
 
 
 
