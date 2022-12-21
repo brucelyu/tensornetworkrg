@@ -11,6 +11,7 @@ from abeliantensors import TensorZ2, Tensor
 from ncon import ncon
 from .initial_tensor import initial_tensor
 from .coarse_grain_2d import trg_evenbly, tnr_evenbly, hotrg
+from .coarse_grain_3d import hotrg as hotrg3d
 from .loop_filter import cleanLoop, toymodels
 
 
@@ -159,6 +160,13 @@ class TensorNetworkRG:
 class TensorNetworkRG2D(TensorNetworkRG):
     """
     TNRG for 2D square lattice
+    Tensor leg order convention is
+    A[x, y, x', y']
+      y
+      |
+   x--A--x'
+      |
+      y'
     """
     def block_tensor(self):
         """
@@ -432,10 +440,16 @@ class TensorNetworkRG2D(TensorNetworkRG):
         return vsym, hsym
 
 
-
 class TensorNetworkRG3D(TensorNetworkRG):
     """
     TNRG for 3D cubic lattice
+    Tensor leg order convention is
+    A[x, x', y, y', z, z']
+         z  x'
+         | /
+     y'--A--y
+       / |
+     x   z'
     """
     def two_tensors_sphere_tm(self):
         """
@@ -532,12 +546,97 @@ class TensorNetworkRG3D(TensorNetworkRG):
 
         return x, log_ratio
 
+    def ishermitian_tm(self):
+        # check whether the transfer matrix is hermitian or not
+        # If true, we gather an evidence that the individual tensor
+        # has refelction symmetry
+        ten_cur = self.get_tensor()
+        tm_x = ncon([ten_cur], [[-1, -2, 1, 1, 2, 2]])
+        tm_y = ncon([ten_cur], [[1, 1, -1, -2, 2, 2]])
+        tm_z = ncon([ten_cur], [[1, 1, 2, 2, -1, -2]])
+        xsym = tm_x.allclose(
+            tm_x.transpose().conj()
+        )
+        ysym = tm_y.allclose(
+            tm_y.transpose().conj()
+        )
+        zsym = tm_z.allclose(
+            tm_z.transpose().conj()
+        )
+        return xsym, ysym, zsym
 
+    def hotrg(
+        self,
+        pars={"chi": 4, "cg_eps": 1e-16,
+              "display": True}
+    ):
+        if self.iter_n == 0:
+            self.boundary = "parallel"
+        # read hotrg parameters
+        chi = pars["chi"]
+        cg_eps = pars["cg_eps"]
+        display = pars["display"]
+        # use hotrg to coarse graining
+        Aout = self.get_tensor()
+        # order of corase graining for three directions
+        cg_dirs = ["z", "y", "x"]
+        # a dictionary to save all isometric tensors in 3 directions
+        isom3dir = {}
+        if display:
+            print("--------------------")
+            print("--------------------")
+        for direction in cg_dirs:
+            (Aout,
+             isometries,
+             errs
+             ) = hotrg3d.dirHOTRG(Aout, chi, direction,
+                                  cg_eps=cg_eps)
+            isom3dir[direction] = isometries
+            if display:
+                # dictionary for display of information
+                pname = {"z": ["x", "y"], "y": ["z", "x"], "x": ["y", "z"]}
+                print("This is tensor blocking in {:s} direction".format(
+                    direction)
+                      )
+                print("Truncation in {:s} legs is {:.2e}".format(
+                    pname[direction][0], errs[0])
+                      )
+                print("Truncation in {:s} legs is {:.2e}".format(
+                    pname[direction][1], errs[1])
+                      )
+                print("----------")
+        # update the current tensor
+        self.current_tensor = Aout * 1.0
+        # pull out the tensor norm and save
+        ten_mag = self.pullout_magnitude()
+        self.save_tensor_magnitude(ten_mag)
 
+    def eval_free_energy(self, initial_spin=1, b=2):
+        """
+        See my jupyter notebook on evently's trg
+        for how to calculate the free energy
 
-class HOTRG2D(TensorNetworkRG2D):
-    pass
-
-
-class HOTRG3D(TensorNetworkRG3D):
-    pass
+        initial_spin: int
+            number of spins that the initial tensor corresponds to
+        b: int
+            ratio between the coarse lattice length and the length
+            before RG.
+            A coarser tensor corresponds to b^3 tensors before a RG step.
+        """
+        messg = "iter_n should be length of the tensor magnitute list plus 1"
+        assert len(self.tensor_magnitude) == (self.iter_n + 1), messg
+        # calculate free energy divided by the temperature
+        ten_cur = self.get_tensor()
+        ten_mag_arr = np.array(self.tensor_magnitude)
+        weight = (
+            (1 / initial_spin) *
+            (1 / b**3)**np.array(range(0, self.iter_n + 1))
+                  )
+        # all contributions from the tensor magnitute
+        g = (weight * np.log(ten_mag_arr)).sum()
+        # the contribution from the tracing off the final normalized tensor
+        g += (
+            (1 / (initial_spin * b**(3 * self.iter_n))) *
+            np.log(ncon([ten_cur], [[1, 1, 2, 2, 3, 3]]))
+        )
+        return g
