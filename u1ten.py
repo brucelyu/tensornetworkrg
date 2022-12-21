@@ -59,6 +59,8 @@ def pinv(B, a=[0, 1], b=[2, 3], eps_mach=1e-10, debug=False):
     return Binv
 
 
+# ------------------------- #
+# All functions for slicing
 def slicing(t, slc, indexOrder=None):
     """
     The common method for both the ordinary numpy Tensor
@@ -288,3 +290,5 @@ def sliceLength(slc):
         # calcuate length of the slicing
         legLength = int(np.ceil((slc.stop - slc_start) / slc_step))
     return legLength
+
+# ------------------------- #
