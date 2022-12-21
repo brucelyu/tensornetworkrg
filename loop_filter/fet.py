@@ -108,8 +108,37 @@ def findMats(Gamma, chis, epsilon=1e-13, iter_max=20,
 def optMats(Gamma_h, chis, epsilon=1e-13, iter_max=20,
             epsilon_init=1e-16, display=False):
     """determine the half piece of the low-rank matrix
+    This is the key function for a reflection-symmetric
+    entanglement-filtering process based on FET.
+
     This scheme preserves the reflection symmetry of the plaquette
     environment in both directions.
+
+    There are two working modes for different choices of hyper-parameters
+    - Mode 1 (GILT-like mode):
+    `chis=None` and
+    'epsilon=epsilon_init='a small number
+        So there is only one free hyperparameter in this GILT-like mode.
+
+        Like GILT, the user doesn't specify a smaller bond dimension.
+        Instead, the filtering is controlled completely by
+        a single small number
+        `epsilon = epsilon_init = epsilon_gilt**2`.
+
+        Compared with GILT, current implementation performs a "hard" truncation
+        during the svd of the environment matrix,
+        while GILT uses a "soft" truncation.
+        However, this can be easily adapted here if needed.
+
+    - Mode 2 (FET-like mode):
+    `epsilon=`very small number`=epsilon_cg`
+    and `chis=`smaller than chi, `epsilon_init`=not so small number
+
+    So there are two free hypermarameters in this FET-like mode
+    `chis` is the main parameter to control how much to filter
+    `epsilon_init` is only used to propose a very good initial
+    low-rank matrix as the starting point of the optimzation
+    process.
 
     Args:
         Gamma_h (TensorCommon): half environment tensor
