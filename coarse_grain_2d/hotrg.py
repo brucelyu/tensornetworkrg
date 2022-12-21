@@ -8,9 +8,21 @@
 """
 Various 2D HOTRG implementations
 
+Tensor leg order convention is
+A[x, y, x', y']
+      y
+      |
+   x--A--x'
+      |
+      y'
+
 For the totally-isotropic version, the
 conjugate direction of the tensor is
 assumed to be [-1, 1, -1, 1].
+
+For the reflection-symmetric version, the
+conjugate direction of the tensor is
+assumed to be [1, 1, -1, -1].
 """
 
 import numpy as np
