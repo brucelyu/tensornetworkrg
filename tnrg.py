@@ -232,6 +232,13 @@ class TensorNetworkRG2D(TensorNetworkRG):
                                chiH, chiV, dtol, d_w_prev,
                                disiter, miniter, convtol,
                                is_display)
+        if is_display:
+            print("Truncation Errors:",
+                  "{:.2e}, {:.2e}, {:.2e}, {:.2e}".format(
+                      SPerr_list[0], SPerr_list[1],
+                      SPerr_list[2], SPerr_list[3]
+                  )
+                  )
         # pull out the tensor norm and save
         ten_mag = self.pullout_magnitude()
         self.save_tensor_magnitude(ten_mag)
@@ -259,10 +266,13 @@ class TensorNetworkRG2D(TensorNetworkRG):
         # first apply the FET
         (Alf,
          s,
-         errFET
+         errFET,
+         d_debug
          ) = cleanLoop.fet2dReflSym(ten_cur, chis, epsilon, iter_max,
                                     epsilon_init, bothSides=bothSides,
-                                    display=False)
+                                    init_soft=True,
+                                    display=False,
+                                    return_init_s=True)
         if display:
             print("FET error (or rather 1 - fidelity)",
                   "is {:.4e}.".format(np.abs(errFET)))
@@ -283,6 +293,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
         # pull out the tensor norm and save
         ten_mag = self.pullout_magnitude()
         self.save_tensor_magnitude(ten_mag)
+        return d_debug
 
     def hotrg(
         self,
