@@ -56,7 +56,9 @@ def gilts2dReflSym(A, epsilon=1e-6, convergence_eps=1e-2,
 
 def fet2dReflSym(A, chis, epsilon=1e-13, iter_max=20,
                  epsilon_init=1e-16, bothSides=True,
-                 display=False):
+                 init_soft=False,
+                 display=False,
+                 return_init_s=False):
     """Reflection-symmetric FET for HOTRG in 2D
     The subsequent HOTRG acts on 4-tensor plaquette
         |     |
@@ -106,8 +108,21 @@ def fet2dReflSym(A, chis, epsilon=1e-13, iter_max=20,
     # reflection-symmetric FET
     Gamma_h = envHalfRefSym(Areflhv)
     # find s
-    s = fet.optMats(Gamma_h, chis, epsilon=epsilon, iter_max=iter_max,
-                    epsilon_init=epsilon_init, display=True)
+    if return_init_s is False:
+        s = fet.optMats(Gamma_h, chis, epsilon=epsilon, iter_max=iter_max,
+                        epsilon_init=epsilon_init,
+                        init_soft=init_soft,
+                        display=True)
+    # ---- DEBUG ---- ## |
+    if return_init_s is True:
+        (s,
+         d_debug
+         ) = fet.optMats(Gamma_h, chis, epsilon=epsilon, iter_max=iter_max,
+                         epsilon_init=epsilon_init,
+                         init_soft=init_soft,
+                         display=True,
+                         return_init_s=True)
+    # ---- DEBUG ---- ## |
     # FET approximation error, or 1 - fidelity
     err = fet.fidelity2leg(Gamma_h, s)[1]
     if display:
@@ -120,4 +135,8 @@ def fet2dReflSym(A, chis, epsilon=1e-13, iter_max=20,
     else:
         # only truncate the left leg of A
         Alf = ncon([A, s], [[1, -2, -3, -4], [1, -1]])
+    # ---- DEBUG ---- ## |
+    if return_init_s is True:
+        return Alf, s, err, d_debug
+    # ---- DEBUG ---- ## |
     return Alf, s, err

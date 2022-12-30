@@ -15,7 +15,8 @@ import numpy as np
 from abeliantensors import Tensor, TensorCommon
 
 
-def pinv(B, a=[0, 1], b=[2, 3], eps_mach=1e-10, debug=False):
+def pinv(B, a=[0, 1], b=[2, 3], eps_mach=1e-10, soft=False,
+         debug=False):
     """
     Calculate pesudo inverse of positive semi-definite matrix B.
     We first perform eigenvalue decomposition of B = U d Uh, and only keep
@@ -33,24 +34,32 @@ def pinv(B, a=[0, 1], b=[2, 3], eps_mach=1e-10, debug=False):
     Binv : abeliantensors
         inverse of B
     """
-    def invArray(tensor):
+    def invArray(tensor, softeps=0):
         """
         Invert every element in each block of tensor (Abeliean tensor)
         """
         if type(tensor).__module__.split(".")[1] == 'symmetrytensors':
             invtensor = tensor.copy()
             for mykey in tensor.sects.keys():
-                invtensor[mykey] = 1 / tensor[mykey]
+                invtensor[mykey] = 1 / (tensor[mykey] + softeps)
         else:
-            invtensor = 1 / tensor
+            invtensor = 1 / (tensor + softeps)
         return invtensor
 
-    d, U = B.eig(a, b, hermitian=True, eps=eps_mach)
+    if not soft:
+        d, U = B.eig(a, b, hermitian=True, eps=eps_mach)
+    else:
+        # perform no truncation here but soft inverse below
+        d, U = B.eig(a, b, hermitian=True)
     if debug:
         print("Shape of d and U")
         print(d.shape)
         print(U.shape)
-    dinv = invArray(d)
+    if not soft:
+        dinv = invArray(d)
+    else:
+        # perform soft inversion
+        dinv = invArray(d, softeps=eps_mach)
     contrLegU = list(-np.array(a) - 1) + [1]
     contrLegUh = list(-np.array(b) - 1) + [1]
     Ud = U.multiply_diag(dinv, axis=len(U.shape) - 1, direction='r')

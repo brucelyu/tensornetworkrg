@@ -19,7 +19,7 @@ from ncon import ncon
 import numpy as np
 
 
-def findLR(Gamma, epsilon=1e-13):
+def findLR(Gamma, epsilon=1e-13, soft=False):
     """determine the low-rank matrix from the bond environment
     This is just a prototype to demonstrate how FET works
 
@@ -39,7 +39,7 @@ def findLR(Gamma, epsilon=1e-13):
         lr (TensorCommon): the low-rank matrix
 
     """
-    Gamma_pinv = u1ten.pinv(Gamma, eps_mach=epsilon)
+    Gamma_pinv = u1ten.pinv(Gamma, eps_mach=epsilon, soft=soft)
     lr = ncon([Gamma, Gamma_pinv], [[1, 1, 2, 3], [2, 3, -1, -2]])
     return lr
 
@@ -106,7 +106,11 @@ def findMats(Gamma, chis, epsilon=1e-13, iter_max=20,
 
 
 def optMats(Gamma_h, chis, epsilon=1e-13, iter_max=20,
-            epsilon_init=1e-16, display=False):
+            epsilon_init=1e-16,
+            init_soft=False,
+            display=False,
+            return_init_s=False
+            ):
     """determine the half piece of the low-rank matrix
     This is the key function for a reflection-symmetric
     entanglement-filtering process based on FET.
@@ -159,9 +163,16 @@ def optMats(Gamma_h, chis, epsilon=1e-13, iter_max=20,
     # s = Gamma_h.eye(Gamma_h.shape[0])
     GammaBaby = ncon([Gamma_h, Gamma_h.conj()],
                      [[-1, -3, 1, 2], [-2, -4, 1, 2]])
-    lr = findLR(GammaBaby, epsilon=epsilon_init)
+    # ---- debug ---- ## |
+    if return_init_s is True:
+        d_debug = GammaBaby.eig([0, 1], [2, 3], hermitian=True)[0]
+    # ---- debug ---- ## |
+    lr = findLR(GammaBaby, epsilon=epsilon_init, soft=init_soft)
     # split lr to find s
     s, ds = lr.split([0], [1], return_sings=True)[:2]
+    if display:
+        print("The full spectrum of the initial low-rank matrix is")
+        print(-np.sort(-ds.to_ndarray()))
     s = u1ten.slicing(s, (slice(None), slice(chis)),
                       indexOrder=(ds, ds))
     # approximation metric
@@ -224,6 +235,10 @@ def optMats(Gamma_h, chis, epsilon=1e-13, iter_max=20,
     psipsi, phiphi = fidelity2leg(Gamma_h, s)[2:4]
     psi2phi = (psipsi / phiphi).norm()
     s = s * (psi2phi)**(1/8)
+    # ---- debug ---- ## |
+    if return_init_s is True:
+        return s, d_debug
+    # ---- debug ---- ## |
     return s
 
 
