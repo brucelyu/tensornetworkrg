@@ -58,7 +58,8 @@ def fet2dReflSym(A, chis, epsilon=1e-13, iter_max=20,
                  epsilon_init=1e-16, bothSides=True,
                  init_soft=False,
                  display=False,
-                 return_init_s=False):
+                 return_init_s=False,
+                 init_stable=False):
     """Reflection-symmetric FET for HOTRG in 2D
     The subsequent HOTRG acts on 4-tensor plaquette
         |     |
@@ -112,7 +113,8 @@ def fet2dReflSym(A, chis, epsilon=1e-13, iter_max=20,
         s = fet.optMats(Gamma_h, chis, epsilon=epsilon, iter_max=iter_max,
                         epsilon_init=epsilon_init,
                         init_soft=init_soft,
-                        display=True)
+                        display=display,
+                        init_stable=init_stable)
     # ---- DEBUG ---- ## |
     if return_init_s is True:
         (s,
@@ -120,13 +122,12 @@ def fet2dReflSym(A, chis, epsilon=1e-13, iter_max=20,
          ) = fet.optMats(Gamma_h, chis, epsilon=epsilon, iter_max=iter_max,
                          epsilon_init=epsilon_init,
                          init_soft=init_soft,
-                         display=True,
-                         return_init_s=True)
+                         display=display,
+                         return_init_s=True,
+                         init_stable=init_stable)
     # ---- DEBUG ---- ## |
     # FET approximation error, or 1 - fidelity
     err = fet.fidelity2leg(Gamma_h, s)[1]
-    if display:
-        print("FET error (1 - fidelity) is {:.4e}".format(np.abs(err)))
     # apply s to input tensor A to truncate loops
     if bothSides:
         # truncate both the left and right legs of A

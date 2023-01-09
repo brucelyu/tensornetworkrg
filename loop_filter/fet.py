@@ -19,7 +19,8 @@ from ncon import ncon
 import numpy as np
 
 
-def findLR(Gamma, epsilon=1e-13, soft=False):
+def findLR(Gamma, epsilon=1e-13, soft=False,
+           chiCut=None):
     """determine the low-rank matrix from the bond environment
     This is just a prototype to demonstrate how FET works
 
@@ -39,7 +40,8 @@ def findLR(Gamma, epsilon=1e-13, soft=False):
         lr (TensorCommon): the low-rank matrix
 
     """
-    Gamma_pinv = u1ten.pinv(Gamma, eps_mach=epsilon, soft=soft)
+    Gamma_pinv = u1ten.pinv(Gamma, eps_mach=epsilon,
+                            soft=soft, chiCut=chiCut)
     lr = ncon([Gamma, Gamma_pinv], [[1, 1, 2, 3], [2, 3, -1, -2]])
     return lr
 
@@ -50,6 +52,9 @@ def findMats(Gamma, chis, epsilon=1e-13, iter_max=20,
     given the bond environment and the squeezed bond dimension
     This is a iterative method, similar to GILTs's recursive approach,
     but it can be made more general to impose reflection symmetry
+
+    Reflection symmetry in one direction is preserved,
+    but that in the other direction isn't.
 
     Args:
         Gamma (TensorCommon): bond environment
@@ -109,7 +114,8 @@ def optMats(Gamma_h, chis, epsilon=1e-13, iter_max=20,
             epsilon_init=1e-16,
             init_soft=False,
             display=False,
-            return_init_s=False
+            return_init_s=False,
+            init_stable=False
             ):
     """determine the half piece of the low-rank matrix
     This is the key function for a reflection-symmetric
@@ -159,22 +165,20 @@ def optMats(Gamma_h, chis, epsilon=1e-13, iter_max=20,
         s (TensorCommon): the half piece of the low-rank matrix
 
     """
-    # initialize s matrix using the baby version FET
+    # Step 1: initialize s matrix using the baby version FET
     # s = Gamma_h.eye(Gamma_h.shape[0])
-    GammaBaby = ncon([Gamma_h, Gamma_h.conj()],
-                     [[-1, -3, 1, 2], [-2, -4, 1, 2]])
-    # ---- debug ---- ## |
-    if return_init_s is True:
-        d_debug = GammaBaby.eig([0, 1], [2, 3], hermitian=True)[0]
-    # ---- debug ---- ## |
-    lr = findLR(GammaBaby, epsilon=epsilon_init, soft=init_soft)
-    # split lr to find s
-    s, ds = lr.split([0], [1], return_sings=True)[:2]
-    if display:
-        print("The full spectrum of the initial low-rank matrix is")
-        print(-np.sort(-ds.to_ndarray()))
-    s = u1ten.slicing(s, (slice(None), slice(chis)),
-                      indexOrder=(ds, ds))
+    if init_stable:
+        s, d_debug = init_s(Gamma_h, chis, epsilon=epsilon,
+                            return_d=return_init_s,
+                            display=display)
+    else:
+        s, d_debug = init_s_gilt(
+            Gamma_h, chis, epsilon_init,
+            init_soft, return_init_s,
+            display=display
+        )
+    # Step 1 finished
+
     # approximation metric
     # 1. fidelity and 1 - fidelity
     f, err = fidelity2leg(Gamma_h, s)[:2]
@@ -182,51 +186,77 @@ def optMats(Gamma_h, chis, epsilon=1e-13, iter_max=20,
     lr = s2lr(s)
     ee = entropy(lr)
     if display:
+        chis_act = s.flatten_dim(s.shape[1])
         print("The initial 1 - fidelity is {:.4e}".format(err))
         print("The initial entropy for",
               "the low-rank matrix is {:.4f}".format(ee))
+        print("The squeezed bond dimension is --{:d}--".format(chis_act))
         print("The spectrum of the low-rank matrix is")
         s_darr = s.svd([0], [1])[1].to_ndarray()
         s_darr = -np.sort(-s_darr)
         print(s_darr)
-    # enter the iteration
+    # Step 2: enter the iteration
     for k in range(iter_max):
         # update s
         s = LinUpdateMats(Gamma_h, s, epsilon)
         # hosvd-like truncating right leg of s
         proj_s = s.svd([1], [0], eps=epsilon*100)[0]
         s = ncon([s, proj_s.conj()], [[-1, 1], [1, -2]])
-        # approximation metric
-        # 1. fidelity and 1 - fidelity
-        f, errNew = fidelity2leg(Gamma_h, s)[:2]
-        # 2. entanglement entropy
-        lr = s2lr(s)
-        ee = entropy(lr)
-        if display and (np.mod(k+1, 5) == 0):
-            print("This is the {:d}-th iteration".format(k))
-            print("The 1 - fidelity is {:.4e}".format(errNew))
-            print("The entropy for",
-                  "the low-rank matrix is {:.4f}".format(ee))
-            print("The spectrum of the low-rank matrix is")
-            s_darr = s.svd([0], [1])[1].to_ndarray()
-            s_darr = -np.sort(-s_darr)
-            print(s_darr)
+
+        # Step 3: check the iteration stopping condition
+
+        # for a GILT-like procedure
+        # stop the iteration when we get a projector
         if chis is None:
-            # for a GILT-like procedure
-            # stop the iteration when we get a projector
+            # approximation metric:
+            # 1. entanglement entropy
+            lr = s2lr(s)
+            ee = entropy(lr)
+            # 2. fidelity and 1 - fidelity
+            f, errNew = fidelity2leg(Gamma_h, s)[:2]
+            if display:
+                print("This is the {:d}-th iteration".format(k+1))
+                print("The 1 - fidelity is {:.4e}".format(errNew))
+                print("The entropy for",
+                      "the low-rank matrix is {:.4f}".format(ee))
+                print("The spectrum of the low-rank matrix is")
+                s_darr = s.svd([0], [1])[1].to_ndarray()
+                s_darr = -np.sort(-s_darr)
+                print(s_darr)
             chisShould = np.exp(ee)
             chisCur = s.flatten_shape(s.shape)[1]
             if np.abs(chisCur - chisShould) < 1e-2:
                 break
-        else:
-            # for an FET-like procedure, where
-            # a preference `chis` is specified
-            if k > 5:
-                errDelta = np.abs(errNew - err) / np.abs(err)
-                if (np.abs(errNew) < epsilon) or (errDelta < 1e-2):
-                    err = errNew
-                    break
-        err = errNew
+
+        # for an FET-like procedure, where
+        # a preference `chis` is specified
+        checkStep = 100
+        # initial break
+        stop_eps = epsilon * 10
+        if (np.abs(err) < stop_eps) and (chis is not None):
+            break
+
+        if (np.mod(k+1, checkStep) == 0) and (chis is not None):
+            # approximation metric:
+            # fidelity and 1 - fidelity
+            f, errNew = fidelity2leg(Gamma_h, s)[:2]
+            if display:
+                print("This is the {:d}-th iteration".format(k+1))
+                print("The 1 - fidelity is {:.4e}".format(errNew))
+                if not init_stable:
+                    print("The spectrum of the low-rank matrix is")
+                    s_darr = s.svd([0], [1])[1].to_ndarray()
+                    s_darr = -np.sort(-s_darr)
+                    print(s_darr)
+            errDelta = np.abs(errNew - err) / np.abs(err)
+            # check whether to step break the iteration
+            if (np.abs(errNew) < stop_eps) or (errDelta < 1e-2):
+                err = errNew
+                break
+            # update the approximation error
+            err = errNew
+
+    # Step 4: take care of the overall magnitude
     # Since the optimization uses fidelity as the cost function,
     # the overall magnetitute of the tensor is not determined.
     # (this is like using minimizing the angle between two vectors)
@@ -240,6 +270,62 @@ def optMats(Gamma_h, chis, epsilon=1e-13, iter_max=20,
         return s, d_debug
     # ---- debug ---- ## |
     return s
+
+
+# Initialization of the half piece of the low-rank matrix
+# Scheme 1: GILT-like initialization
+def init_s_gilt(Gamma_h, chis, epsilon_init,
+                init_soft=False,
+                return_init_s=False, display=True):
+    GammaBaby = ncon([Gamma_h, Gamma_h.conj()],
+                     [[-1, -3, 1, 2], [-2, -4, 1, 2]])
+    # ---- debug ---- ## |
+    d_debug = None
+    if return_init_s is True:
+        d_debug = GammaBaby.eig([0, 1], [2, 3], hermitian=True)[0]
+    # ---- debug ---- ## |
+
+    if chis is None:
+        chiCut = None
+    else:
+        chiCut = chis**2
+    lr = findLR(GammaBaby, epsilon=epsilon_init,
+                soft=init_soft, chiCut=chiCut)
+    # split lr to find s
+    s, ds = lr.split([0], [1], return_sings=True)[:2]
+    if display:
+        print("The full spectrum of the initial low-rank matrix is")
+        print(-np.sort(-ds.to_ndarray()))
+    s = u1ten.slicing(s, (slice(None), slice(chis)),
+                      indexOrder=(ds, ds))
+    return s, d_debug
+
+
+# Scheme 2: hosvd-like initialization:
+# - stable
+# - can tell the difference between inner and outer loop
+#   to certain extent
+def init_s(Gamma_h, chis, epsilon,
+           return_d=False, display=True):
+    # error function
+    def trunc_err_func(eigv, chi):
+        return np.sum(eigv[chi:]) / np.sum(eigv)
+    init_env = ncon([Gamma_h, Gamma_h.conj()],
+                    [[-2, -1, 2, 3], [1, 1, 2, 3]])
+    (d,
+     v_s,
+     SPerr
+     ) = init_env.eig([0], [1],
+                      hermitian=True,
+                      chis=[i+1 for i in range(chis)],
+                      trunc_err_func=trunc_err_func,
+                      eps=epsilon, return_rel_err=True
+                      )
+    if display:
+        print("Stable initialization is applied...")
+        print("The initial projective truncation",
+              "error is {:.2e}.".format(SPerr))
+    return v_s, d
 
 
 def LinUpdateMats(Gamma_h, s, epsilon):

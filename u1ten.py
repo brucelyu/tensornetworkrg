@@ -15,8 +15,8 @@ import numpy as np
 from abeliantensors import Tensor, TensorCommon
 
 
-def pinv(B, a=[0, 1], b=[2, 3], eps_mach=1e-10, soft=False,
-         debug=False):
+def pinv(B, a=[0, 1], b=[2, 3], eps_mach=1e-10,
+         soft=False, chiCut=None, debug=False):
     """
     Calculate pesudo inverse of positive semi-definite matrix B.
     We first perform eigenvalue decomposition of B = U d Uh, and only keep
@@ -47,7 +47,8 @@ def pinv(B, a=[0, 1], b=[2, 3], eps_mach=1e-10, soft=False,
         return invtensor
 
     if not soft:
-        d, U = B.eig(a, b, hermitian=True, eps=eps_mach)
+        d, U = B.eig(a, b, hermitian=True,
+                     chis=chiCut, eps=eps_mach)
     else:
         # perform no truncation here but soft inverse below
         d, U = B.eig(a, b, hermitian=True)

@@ -250,7 +250,9 @@ class TensorNetworkRG2D(TensorNetworkRG):
               "chis": None, "iter_max": 10,
               "epsilon": 1e-10, "epsilon_init": 1e-10,
               "bothSides": True, "display": True
-              }
+              },
+        # tentative
+        init_stable=False
     ):
         if self.iter_n == 0:
             self.boundary = "parallel"
@@ -270,9 +272,10 @@ class TensorNetworkRG2D(TensorNetworkRG):
          d_debug
          ) = cleanLoop.fet2dReflSym(ten_cur, chis, epsilon, iter_max,
                                     epsilon_init, bothSides=bothSides,
-                                    init_soft=True,
-                                    display=False,
-                                    return_init_s=True)
+                                    init_soft=False,
+                                    display=display,
+                                    return_init_s=True,
+                                    init_stable=init_stable)
         if display:
             print("FET error (or rather 1 - fidelity)",
                   "is {:.4e}.".format(np.abs(errFET)))
@@ -293,7 +296,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
         # pull out the tensor norm and save
         ten_mag = self.pullout_magnitude()
         self.save_tensor_magnitude(ten_mag)
-        return d_debug
+        return d_debug, errFET, SPerrList
 
     def hotrg(
         self,
