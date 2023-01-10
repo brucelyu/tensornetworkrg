@@ -33,7 +33,7 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
         Tc = (2 / np.log(1 + np.sqrt(2)))
         Tval = relT * Tc
         ising2d.set_model_parameters(Tval, h)
-    if scheme == "fet-hotrg":
+    if scheme == "fet-hotrg" or "hotrg":
         init_dirs = [1, 1, -1, -1]
     # generate initial tensor
     ising2d.generate_initial_tensor(onsite_symmetry=isZ2,
@@ -49,12 +49,16 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
     print("TNRG epsilon: --{:.2e}--".format(dtol))
     print("TRNG iteration step: --{:d}--".format(rg_n))
     print("------")
+
+    # Next is for hyper-parameters of
+    # different blocking tensor schemes
+    print("The TNRG scheme is --{:s}--,".format(scheme),
+          "with version --{:s}--".format(ver))
+    # fet-hotrg
     if scheme == "fet-hotrg":
         chis = pars["chis"]
         iter_max = pars["iter_max"]
         if ver == "base":
-            print("The TNRG scheme is --{:s}--,".format(scheme),
-                  "with version --{:s}--".format(ver))
             print("The additional hyper-parameters are")
             print("Entanglement-filtering squeezed bond dimension: ",
                   "--{:d}--".format(chis))
@@ -63,59 +67,65 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
                          "chis": chis, "iter_max": iter_max,
                          "epsilon": dtol, "epsilon_init": dtol,
                          "bothSides": True, "display": True}
-            # enter the RG iteration
-            (
-                errFETList,
-                errVList,
-                errHList,
-                gList
-            ) = tnrgIterate(ising2d, rg_n, scheme, ver,
-                            tnrg_pars, pars["dataDir"])
-            gErrList = np.abs(np.array(gList) - exact_g) / np.abs(exact_g)
-            # save the RG flow of various errors
-            outDir = pars["outDir"]
-            if outDir is not None:
-                fname = "{:s}-{:s}-chi{:d}.pkl".format(scheme, ver, chi)
-                saveData(outDir,
-                         fname,
-                         data=[chi, errFETList, errVList, errHList, gErrList]
-                         )
+        else:
+            raise NotImplementedError(
+                "No such version for {:s}".format(scheme)
+            )
+
+    # HOTRG
+    elif scheme == "hotrg":
+        if ver == "base":
+            tnrg_pars = {"chi": chi, "dtol": dtol, "display": True}
+    elif scheme == "tnr":
+        raise NotImplementedError("Not implemented yet")
+    else:
+        raise NotImplementedError("Not implemented yet")
+
+    # enter the RG iteration
+    (
+        errFETList,
+        errVList,
+        errHList,
+        gList
+    ) = tnrgIterate(ising2d, rg_n, scheme, ver,
+                    tnrg_pars, pars["dataDir"])
+    gErrList = np.abs(np.array(gList) - exact_g) / np.abs(exact_g)
+    # save the RG flow of various errors
+    outDir = pars["outDir"]
+    if outDir is not None:
+        fname = "{:s}-{:s}-chi{:d}.pkl".format(scheme, ver, chi)
+        saveData(outDir,
+                 fname,
+                 data=[chi, errFETList, errVList, errHList, gErrList]
+                 )
 
 
 def tnrgIterate(tnrgCase, rg_n=21, scheme="fet-hotrg", ver="base",
                 tnrg_pars={}, dataDir=None):
     assert tnrgCase.get_iteration() == 0
-    if scheme == "fet-hotrg":
-        if ver == "base":
-            errFETList = []
-            errVList = []
-            errHList = []
-            gList = []
-            # iteration
-            for k in range(rg_n):
-                print("At RG step {:d}".format(tnrgCase.get_iteration()))
-                (d_debug,
-                 errFET,
-                 SPerrs
-                 ) = tnrgCase.fet_hotrg(tnrg_pars, init_stable=False)
-                cur_g = tnrgCase.eval_free_energy()
-                # Append to list
-                errFETList.append(errFET)
-                errVList.append(SPerrs[0])
-                errHList.append(SPerrs[1])
-                gList.append(cur_g.norm())
-                print("Shape of the tensor is")
-                print(tnrgCase.get_tensor().shape)
-                print("----------")
-                print("----------")
-            return errFETList, errVList, errHList, gList
-        else:
-            raise NotImplementedError("Not implemented yet")
+    lrerrList = []
+    errVList = []
+    errHList = []
+    gList = []
+    for k in range(rg_n):
+        print("At RG step {:d}".format(tnrgCase.get_iteration()))
+        (
+         lrerrs,
+         SPerrs
+         ) = tnrgCase.rgmap(tnrg_pars,
+                            scheme=scheme, ver=ver)
+        cur_g = tnrgCase.eval_free_energy()
+        # Append to list
+        lrerrList.append(lrerrs)
+        errVList.append(SPerrs[0])
+        errHList.append(SPerrs[1])
+        gList.append(cur_g.norm())
+        print("Shape of the tensor is")
+        print(tnrgCase.get_tensor().shape)
+        print("----------")
+        print("----------")
 
-    elif scheme == "tnr":
-        pass
-    else:
-        raise NotImplementedError("Not implemented yet")
+    return lrerrList, errVList, errHList, gList
 
 
 def saveData(outDir, fname, data=None):
@@ -157,3 +167,31 @@ def plotErrs(chi, errFETList, errVList, errHList, gErrList,
     # save figure
     figFile = outDir + "/" + fname
     plt.savefig(figFile, bbox_inches='tight', dpi=300)
+
+
+def plotErrs2(chi, errVList, errHList, gErrList,
+              startn=1, endn=-1, outDir=None, fname=None):
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(6, 5))
+    xArr = [k for k in range(startn, len(errVList) + endn)]
+    ax2 = plt.subplot(211)
+    ax2.plot(xArr, errVList[startn:endn], "bx-", alpha=0.8,
+             label="Vert. RG error")
+    ax2.plot(xArr, errHList[startn:endn], "b+-", alpha=0.8,
+             label="Hori. RG error")
+    plt.ylabel("RG errors")
+    plt.yscale("log")
+    plt.legend()
+    plt.title("Baseline: HOTRG")
+
+    ax3 = plt.subplot(212)
+    ax3.plot(gErrList, "ko-", alpha=0.6,
+             label="stable error: {:.2e}".format(gErrList[-1]))
+    plt.ylabel("Relative error of free energy")
+    plt.yscale("log")
+    plt.xlabel(r"RG step ($\chi$={:d})".format(chi))
+    plt.legend()
+    # save figure
+    figFile = outDir + "/" + fname
+    plt.savefig(figFile, bbox_inches='tight', dpi=300)
+
