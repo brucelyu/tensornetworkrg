@@ -59,13 +59,14 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
         chis = pars["chis"]
         iter_max = pars["iter_max"]
         if ver == "base":
+            epsilon = dtol * 1e-5
             print("The additional hyper-parameters are")
             print("Entanglement-filtering squeezed bond dimension: ",
                   "--{:d}--".format(chis))
             print("The maximal FET iteration step: --{:d}--".format(iter_max))
             tnrg_pars = {"chi": chi, "dtol": dtol,
                          "chis": chis, "iter_max": iter_max,
-                         "epsilon": dtol, "epsilon_init": dtol,
+                         "epsilon": epsilon, "epsilon_init": epsilon,
                          "bothSides": True, "display": True}
         else:
             raise NotImplementedError(
