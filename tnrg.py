@@ -243,6 +243,9 @@ class TensorNetworkRG2D(TensorNetworkRG):
         ten_mag = self.pullout_magnitude()
         self.save_tensor_magnitude(ten_mag)
         self.isometry_applied = [v, w]
+        # return local approximation errors
+        lrerr = SPerr_list[1]
+        return lrerr, SPerr_list[2:]
 
     def fet_hotrg(
         self,
@@ -326,6 +329,44 @@ class TensorNetworkRG2D(TensorNetworkRG):
         # pull out the tensor norm and save
         ten_mag = self.pullout_magnitude()
         self.save_tensor_magnitude(ten_mag)
+
+        # return approximation errors
+        # no loop-filtering error
+        lrerr = 0
+        return lrerr, SPerrList
+
+    def rgmap(self, tnrg_pars,
+              scheme="fet-hotrg", ver="base"):
+        """
+        coarse grain the tensors using schemes above
+        - block tensor
+        - trg
+        - tnr
+        - fet-hotrg
+        - hotrg
+
+        Return two kinds of local replacement errors
+        1) loop-filtering process
+        2) coarse graining process
+        """
+        if scheme == "fet-hotrg":
+            if ver == "base":
+                (d_debug,
+                 lferrs,
+                 SPerrs
+                 ) = self.fet_hotrg(tnrg_pars,
+                                    init_stable=False)
+        elif scheme == "hotrg":
+            if ver == "base":
+                (lferrs,
+                 SPerrs
+                 ) = self.hotrg(tnrg_pars)
+        elif scheme == "tnr":
+            if ver == "base":
+                (lferrs,
+                 SPerrs
+                 ) = self.tnr(tnrg_pars)
+        return lferrs, SPerrs
 
     def init_dw(self):
         ten_cur = self.get_tensor()
