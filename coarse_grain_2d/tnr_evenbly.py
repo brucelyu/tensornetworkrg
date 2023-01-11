@@ -225,6 +225,7 @@ def eyelike(ten, legk):
     eyeres = ten.eye(ten.shape[legk], qim=qim)
     return eyeres
 
+
 # for updating the s matrix
 # function for updating s, y, u
 def update_s_evenbly(Ain, q, s, y, u, dtol=1e-10):
@@ -237,7 +238,7 @@ def update_s_evenbly(Ain, q, s, y, u, dtol=1e-10):
     center_gamma_s = construct_center_gamma_s(CCstar, q, y, u)
     gamma_s = construct_gamma_s(center_gamma_s, s)
     stemp = ncon([u1ten.pinv(omega_s/omega_s.trace(), [0], [1],
-                             eps_mach=dtol),
+                             eps_mach=dtol*1e-5),
                   gamma_s],
                  [[-1, 1], [1, -2]])
     # we normalize the s during the optimization,
