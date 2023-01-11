@@ -33,8 +33,12 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
         Tc = (2 / np.log(1 + np.sqrt(2)))
         Tval = relT * Tc
         ising2d.set_model_parameters(Tval, h)
-    if scheme == "fet-hotrg" or "hotrg":
+    if scheme in ["fet-hotrg", "hotrg"]:
         init_dirs = [1, 1, -1, -1]
+    elif scheme == "tnr":
+        init_dirs = [1, 1, 1, 1]
+    else:
+        raise NotImplementedError("Not implemented yet")
     # generate initial tensor
     ising2d.generate_initial_tensor(onsite_symmetry=isZ2,
                                     init_dirs=init_dirs)
@@ -78,7 +82,22 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
         if ver == "base":
             tnrg_pars = {"chi": chi, "dtol": dtol, "display": True}
     elif scheme == "tnr":
-        raise NotImplementedError("Not implemented yet")
+        chis = pars["chis"]
+        iter_max = pars["iter_max"]
+        miniter = 200
+        convtol = 0.01
+        if ver == "base":
+            print("The additional hyper-parameters are")
+            print("Entanglement-filtering squeezed bond dimension: ",
+                  "--{:d}--".format(chis))
+            print("The maximal disentangling iteration step:",
+                  "--{:d}--".format(iter_max))
+            tnrg_pars = {
+                "chiM": chi + 2, "chiH": chi, "chiV": chi, "dtol": dtol,
+                "chiS": chis, "chiU": chis,
+                "disiter": iter_max,
+                "miniter": miniter, "convtol": convtol,
+                "is_display": True}
     else:
         raise NotImplementedError("Not implemented yet")
 
