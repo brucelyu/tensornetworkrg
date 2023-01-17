@@ -63,7 +63,7 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
         chis = pars["chis"]
         iter_max = pars["iter_max"]
         if ver == "base":
-            epsilon = dtol * 1e-5
+            epsilon = dtol * 1.0
             print("The additional hyper-parameters are")
             print("Entanglement-filtering squeezed bond dimension: ",
                   "--{:d}--".format(chis))
