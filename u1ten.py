@@ -12,7 +12,7 @@ maybe move to that package implementations eventually
 import functools
 from ncon import ncon
 import numpy as np
-from abeliantensors import Tensor, TensorCommon
+from abeliantensors import Tensor, TensorCommon, AbelianTensor
 
 
 def pinv(B, a=[0, 1], b=[2, 3], eps_mach=1e-10,
@@ -302,3 +302,53 @@ def sliceLength(slc):
     return legLength
 
 # ------------------------- #
+
+
+# ------------------------- #
+# All functions for looping a leg
+# and fixing a leg index
+def fixleg(ten, posleg, ind):
+    """fix one leg of a tensor
+
+    Args:
+        ten (TensorCommon): input tensor
+        posleg (int): leg to be fixed
+        ind (int or tuple): index value
+
+    Returns:
+        For a ordinary tensor, output is
+        tensl = ten[:,..., ind, ..., :]
+        where the posleg-th position is fixed to `ind`
+
+    """
+    assert type(posleg) is int
+    # Read off number of legs of the tensor, ten
+    legnum = len(ten.shape)
+    slc = [slice(None)] * legnum
+    if issubclass(type(ten), Tensor) or (type(ten) is np.ndarray):
+        # for ordinary tensors
+        slc[posleg] = ind
+        tensl = ten[tuple(slc)]
+    elif issubclass(type(ten), AbelianTensor):
+        # Read off the charge and degenerate index
+        partn, degind = ind
+        # create properties for output tensor
+        outshape = ten.shape[:posleg] + ten.shape[posleg+1:]
+        outqhape = ten.qhape[:posleg] + ten.qhape[posleg+1:]
+        outcharge = (ten.charge + partn * ten.dirs[posleg]) % ten.qodulus
+        outdirs = ten.dirs[:posleg] + ten.dirs[posleg+1:]
+        # create an empty Z2 tensor with the same type and
+        # with one leg less (one leg is fixed)
+        tensl = ten.zeros(shape=outshape, qhape=outqhape,
+                          dirs=outdirs, charge=outcharge)
+        # relate the tensl to ten
+        slc[posleg] = degind
+        # set the value of sliced tensor according to the input tensor
+        for partsect in tensl.sects.keys():
+            oldpartsect = partsect[:posleg] + (partn,) + partsect[posleg:]
+            tensl[partsect] = ten[oldpartsect][tuple(slc)]
+    else:
+        raise TypeError("Input tensor type not supported")
+    return tensl
+
+# TODO: loopleg(ten, posleg) function
