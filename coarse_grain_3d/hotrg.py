@@ -293,13 +293,16 @@ def blockAlongZ(A, B, pzx, pzy, comm=None):
         jobind = 0
         for i in u1ten.loopleg(A, 5):
             # fix one leg to i
-            Ai = u1ten.fixleg(A, 5, i)
-            Bi = u1ten.fixleg(B, 4, i)
+            # Ai = u1ten.fixleg(A, 5, i)
+            # Bi = u1ten.fixleg(B, 4, i)
             for j in u1ten.loopleg(A, 3):
                 # TAKE CARE OF THE PARALLEL COMPUTATION
                 if jobind % size != rank:
                     jobind += 1
                     continue
+                # fix one leg to i
+                Ai = u1ten.fixleg(A, 5, i)
+                Bi = u1ten.fixleg(B, 4, i)
                 # fix the other leg to j
                 Aij = u1ten.fixleg(Ai, 3, j)
                 pzyj = u1ten.fixleg(pzy, 0, j)
