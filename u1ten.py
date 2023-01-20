@@ -351,4 +351,33 @@ def fixleg(ten, posleg, ind):
         raise TypeError("Input tensor type not supported")
     return tensl
 
-# TODO: loopleg(ten, posleg) function
+
+def loopleg(ten, posleg):
+    """loop through all indices of a leg of a tensor
+
+    Args:
+        ten (TensorCommon): input tensor
+        posleg (int): leg to be fixed
+
+    Returns:
+        1) For ordinary tensors, return
+            integer i
+        from 0 till the size of the leg;
+        2) For U1-symmetryc tensors, return
+            tuple (curq, degind)
+        with the first element the charge section number
+        and the second element the degenerate index number
+
+    """
+    assert type(posleg) is int
+    legShape = ten.shape[posleg]
+    if issubclass(type(ten), Tensor) or (type(ten) is np.ndarray):
+        # for ordinary tensors
+        for i in range(legShape):
+            yield i
+    elif issubclass(type(ten), AbelianTensor):
+        # for U1-symmetric tensors
+        legQhape = ten.qhape[posleg]
+        for curq, degN in zip(legQhape, legShape):
+            for degind in range(degN):
+                yield (curq, degind)
