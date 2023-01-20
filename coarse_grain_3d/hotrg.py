@@ -22,6 +22,7 @@ assumed to be [1, -1, 1, -1, 1, -1].
 
 import numpy as np
 from ncon import ncon
+from .. import u1ten
 
 
 # The original scheme of HOTRG: one direction at a time
@@ -272,8 +273,13 @@ def blockAlongZ(A, B, pzx, pzy, comm=None):
                      [1, 8, -1], [6, 3, -3], [2, 9, -2], [7, 4, -4]
                      ])
 
-    #  parallel computation
+    #  parallel computation start --
     else:
+        # broadcase the input tensors
+        A = comm.bcast(A, root=0)
+        B = comm.bcast(B, root=0)
+        pzx = comm.bcast(pzx, root=0)
+        pzy = comm.bcast(pzy, root=0)
         # we fix two indices
         # A   is fixed to   A[:, :, :, j, :, i]
         # B   is fixed to   B[:, :, :, :, i, :]
@@ -281,13 +287,41 @@ def blockAlongZ(A, B, pzx, pzy, comm=None):
 
         # initialize the output tensor after contraction
         Aout = 0
-        # TAKE CARE OF PARALLEL COMPUTATION
         rank = comm.Get_rank()
         size = comm.Get_size()
         # job indicator
         jobind = 0
-        # TODO
-        raise NotImplementedError("Not implemented yet")
+        for i in u1ten.loopleg(A, 5):
+            # fix one leg to i
+            Ai = u1ten.fixleg(A, 5, i)
+            Bi = u1ten.fixleg(B, 4, i)
+            for j in u1ten.loopleg(A, 3):
+                # TAKE CARE OF THE PARALLEL COMPUTATION
+                if jobind % size != rank:
+                    jobind += 1
+                    continue
+                # fix the other leg to j
+                Aij = u1ten.fixleg(Ai, 3, j)
+                pzyj = u1ten.fixleg(pzy, 0, j)
+                # the following two contraction has
+                # memory cost:        O(chi^6), and
+                # computational cost: O(chi^8)
+                blockup = ncon([Aij, pzx.conjugate(), pzy.conjugate()],
+                               [[1, -4, 2, -3], [1, -5, -1], [2, -6, -2]])
+                blockdown = ncon([Bi, pzx, pzyj],
+                                 [[-5, 1, -6, 2, -3],
+                                  [-4, 1, -1], [2, -2]])
+                # the final contraction has
+                # memory cost:         O(chi^6), and
+                # comuputational cost: O(chi^9)
+                Aout += ncon([blockup, blockdown],
+                             [[-1, -3, -5, 1, 2, 3], [-2, -4, -6, 1, 2, 3]])
+                # increase the job indicator for parallel computation
+                jobind += 1
+        # collective reducing sum operation
+        Aout = comm.allreduce(Aout)
+
+    #  parallel computation end
     return Aout
 
 
