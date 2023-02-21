@@ -120,6 +120,147 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
                  )
 
 
+def benm3DIsing(T=5.0, h=0, scheme="hotrg3d",
+                ver="base",
+                pars={}):
+    """
+    Benchmark TNRG schemes on 3D Ising model by generating
+    1) local approximation error RG flow
+
+    Kwargs:
+        T (float): temperature
+        h (float): magnetic field
+        scheme (str): coarse graining scheme
+            choice is ["hotrg3d"]
+        ver (str): version of the scheme
+        pars (dict): scheme parameter
+            basic is hotrg + tensor-symmetric parameter:
+            here is an example
+            `pars={"isZ2": True, "rg_n": 12,
+            "chi": 4, "cg_eps": 1e-8, "display": True,
+            "dataDir": None, "determPhase": True}`
+
+    Returns:
+        various RG flows,XFlow, errMaxFlow, eeFlow, SPerrsFlow, lrerrsFlow
+          - XFlow: degenerate index flow, useful for determining critical T
+          - errMaxFlow: maximal RG replacement error in each RG step
+          - eeFlow: entanglement entropies [eexyz, eex, eey, eez]
+          - SPerrsFlow: Flow of RG repalcement errors in each RG step
+          - lrerrsFlow: loop-reduction errors in each RG step
+
+    """
+    # create model instance
+    ising3d = tnrg.TensorNetworkRG3D("ising3d")
+    # set model parameter and create the initial tensor
+    isZ2 = pars["isZ2"]
+    ising3d.set_model_parameters(T, h)
+    ising3d.generate_initial_tensor(onsite_symmetry=isZ2)
+    # read off tnrg parameters
+    chi = pars["chi"]
+    dtol = pars["cg_eps"]
+    rg_n = pars["rg_n"]
+    display = pars["display"]
+
+    if display:
+        print("The basic 3d tnrg parameters are")
+        print("TNRG bond dimension: --{:d}--".format(chi))
+        print("TNRG epsilon: --{:.2e}--".format(dtol))
+        print("TRNG iteration step: --{:d}--".format(rg_n))
+        print("Impose Z2 symmetry? --{}--".format(isZ2))
+        print("------")
+    # generate degenerate index X flow
+    (
+        XFlow, errMaxFlow, eeFlow,
+        SPerrsFlow, lrerrsFlow
+    ) = tnrg3dIterate(ising3d, rg_n, scheme, ver,
+                      tnrg_pars=pars, dataDir=pars["dataDir"],
+                      determPhase=pars["determPhase"])
+    return XFlow, errMaxFlow, eeFlow, SPerrsFlow, lrerrsFlow
+
+
+def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
+                  tnrg_pars={}, dataDir=None, determPhase=True):
+    """
+    Perform the 3D TNRG iteration
+
+    Args:
+        tnrg3dCase (TensorNetworkRG3D):
+            an instance for the class `tnrg.TensorNetworkRG3D`
+
+    Kwargs:
+        rg_n (int): maximal rg iteration step
+        scheme (str): coarse graining scheme
+            choose among ["hotrg3d"]
+        ver (str): version of a given scheme
+            default is ["base"]
+        tnrg_pars (dict): parameters for the tnrg scheme
+        dataDir (str):
+            Path of directory to save data
+
+    Returns:
+        various RG flows,XFlow, errMaxFlow, eeFlow, SPerrsFlow, lrerrsFlow
+          - XFlow: degenerate index flow, useful for determining critical T
+          - errMaxFlow: maximal RG replacement error in each RG step
+          - eeFlow: entanglement entropies [eexyz, eex, eey, eez]
+          - SPerrsFlow: Flow of RG repalcement errors in each RG step
+          - lrerrsFlow: loop-reduction errors in each RG step
+
+    """
+    assert tnrg3dCase.get_iteration() == 0
+    # record rg flows
+    XFlow = []
+    lrerrsFlow = []
+    SPerrsFlow = []
+    errMaxFlow = []
+    eeFlow = []
+    for k in range(rg_n):
+        (
+         lrerrs,
+         SPerrs
+         ) = tnrg3dCase.rgmap(tnrg_pars,
+                              scheme=scheme, ver=ver)
+        # various properties of the current tensor
+        # - Degenerate index:
+        #   1 for trivial phase, 2 for Z2-symmetry breaking phase
+        curX = tnrg3dCase.degIndX()
+        # - Various entanglement entropy
+        eex = tnrg3dCase.entangle(leg="x")[0]
+        eey = tnrg3dCase.entangle(leg="y")[0]
+        eez = tnrg3dCase.entangle(leg="z")[0]
+        eexyz = tnrg3dCase.entangle(leg="xyz")[0]
+        # maximal RG replacement errors of all 3*2=6 squeezers
+        errMax = np.max(SPerrs)
+        # cur_g = tnrg3dCase.eval_free_energy()
+        # record rg flows
+        XFlow.append(curX)
+        lrerrsFlow.append(lrerrs)
+        SPerrsFlow.append(SPerrs)
+        errMaxFlow.append(errMax)
+        eeFlow.append([eexyz, eex, eey, eez])
+        if tnrg_pars["display"]:
+            print("The RG step {:d} finished!".format(
+                tnrg3dCase.get_iteration())
+                  )
+            print("Shape of the tensor is")
+            print(tnrg3dCase.get_tensor().shape)
+            print("Degnerate index X = {:.2f}".format(curX))
+            print("Entanglement entropies:")
+            print("Leg x: {:.2f}, Leg y: {:.2f}, Leg z: {:.2f}".format(
+                eex, eey, eez
+            )
+                  )
+            print("Leg xyz: {:.2f}".format(eexyz))
+            print("Maximal truncation error is {:.2e}".format(errMax))
+            print("----------")
+            print("----------")
+        # exit the RG iteration if already flowed to the trivial phase
+        if determPhase:
+            stop_eps = 0.01
+            if (abs(curX - 1) < stop_eps) or (abs(curX - 2)) < stop_eps:
+                break
+    return XFlow, errMaxFlow, eeFlow, SPerrsFlow, lrerrsFlow
+
+
 def tnrgIterate(tnrgCase, rg_n=21, scheme="fet-hotrg", ver="base",
                 tnrg_pars={}, dataDir=None):
     assert tnrgCase.get_iteration() == 0

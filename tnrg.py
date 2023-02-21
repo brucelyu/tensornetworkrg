@@ -6,6 +6,7 @@
 # Last Modified Date: 20.05.2022
 # Last Modified By  : Xinliang(Bruce) Lyu <lyu@issp.u-tokyo.ac.jp>
 
+import scipy.stats as spstats
 import numpy as np
 from abeliantensors import TensorZ2, Tensor
 from ncon import ncon
@@ -506,6 +507,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
        / |
      x   z'
     """
+    # Play with the "spherical" transfer matrix in radial quantization
     def two_tensors_sphere_tm(self):
         """
         Construct a transfer matrix using sphere
@@ -601,14 +603,27 @@ class TensorNetworkRG3D(TensorNetworkRG):
 
         return x, log_ratio
 
+    # Method for extracting various properties of the 6-leg tensor
+    def generate_tm(self, direction="x"):
+        # generate transfer matrix in x, y, or z direction
+        ten_cur = self.get_tensor()
+        if direction == "x":
+            tm = ncon([ten_cur], [[-1, -2, 1, 1, 2, 2]])
+        elif direction == "y":
+            tm = ncon([ten_cur], [[1, 1, -1, -2, 2, 2]])
+        elif direction == "z":
+            tm = ncon([ten_cur], [[1, 1, 2, 2, -1, -2]])
+        else:
+            raise ValueError("The direction should be among x, y, or z")
+        return tm
+
     def ishermitian_tm(self):
         # check whether the transfer matrix is hermitian or not
         # If true, we gather an evidence that the individual tensor
         # has refelction symmetry
-        ten_cur = self.get_tensor()
-        tm_x = ncon([ten_cur], [[-1, -2, 1, 1, 2, 2]])
-        tm_y = ncon([ten_cur], [[1, 1, -1, -2, 2, 2]])
-        tm_z = ncon([ten_cur], [[1, 1, 2, 2, -1, -2]])
+        tm_x = self.generate_tm(direction="x")
+        tm_y = self.generate_tm(direction="y")
+        tm_z = self.generate_tm(direction="z")
         xsym = tm_x.allclose(
             tm_x.transpose().conj()
         )
@@ -620,6 +635,39 @@ class TensorNetworkRG3D(TensorNetworkRG):
         )
         return xsym, ysym, zsym
 
+    def degIndX(self, direction="z"):
+        tm = self.generate_tm(direction=direction)
+        trsq = (tm.trace()).norm()**2
+        sqtr = (ncon([tm, tm], [[-1, 1], [1, -2]])).trace().norm()
+        return trsq / sqtr
+
+    def entangle(self, leg="x"):
+        ten_cur = self.get_tensor()
+        if leg == "xyz":
+            s = ten_cur.svd([0, 2, 4], [1, 3, 5])[1]
+        elif leg == "x":
+            s = ten_cur.svd([0], [1, 2, 3, 4, 5])[1]
+        elif leg == "y":
+            s = ten_cur.svd([2], [0, 1, 3, 4, 5])[1]
+        elif leg == "z":
+            s = ten_cur.svd([4], [0, 1, 2, 3, 5])[1]
+        else:
+            errMsg = (
+                "leg should be in the set [x, y, z, xyz]"
+            )
+            raise ValueError(errMsg)
+        # maximal s normalized to 1 and sort
+        s = s/s.max()
+        s = s.to_ndarray()
+        s = np.abs(s)
+        s = -np.sort(-s)
+        # calculate entanglement entropy
+        pk = s**2
+        # the following method will take care of the normalization
+        ee = spstats.entropy(pk, base=2)
+        return ee, s
+
+    # coarse graining methods
     def hotrg(
         self,
         pars={"chi": 4, "cg_eps": 1e-16,
@@ -637,6 +685,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
         cg_dirs = ["z", "y", "x"]
         # a dictionary to save all isometric tensors in 3 directions
         isom3dir = {}
+        SPerrList = []
         if display:
             print("--------------------")
             print("--------------------")
@@ -647,6 +696,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
              ) = hotrg3d.dirHOTRG(Aout, chi, direction,
                                   cg_eps=cg_eps)
             isom3dir[direction] = isometries
+            SPerrList.append(errs)
             if display:
                 # dictionary for display of information
                 pname = {"z": ["x", "y"], "y": ["z", "x"], "x": ["y", "z"]}
@@ -665,6 +715,28 @@ class TensorNetworkRG3D(TensorNetworkRG):
         # pull out the tensor norm and save
         ten_mag = self.pullout_magnitude()
         self.save_tensor_magnitude(ten_mag)
+
+        # return approximation errors
+        # no loop-filtering error
+        lrerr = 0
+        return lrerr, SPerrList
+
+    def rgmap(self, tnrg_pars,
+              scheme="hotrg3d", ver="base"):
+        """
+        coarse grain the tensors using schemes above
+        - hotrg3d
+
+        Return two kinds of local replacement errors
+        1) loop-filtering process: it is zero for hotrg
+        2) coarse graining process: x, y, z each; total three
+        """
+        if scheme == "hotrg3d":
+            if ver == "base":
+                (lferrs,
+                 SPerrs
+                 ) = self.hotrg(tnrg_pars)
+        return lferrs, SPerrs
 
     def eval_free_energy(self, initial_spin=1, b=2):
         """
