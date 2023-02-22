@@ -43,7 +43,7 @@ def findTc(iter_n=15, Tlow=4.0, Thi=5.0,
                  label="hi T = {:.5f}".format(Thi))
         plt.plot(Xtry[0:], "gx" + linesty, alpha=alpha,
                  label="try T = {:.5f}".format(Ttry))
-        plt.ylim([0.9, 2.1])
+        plt.ylim([0.8, 2.6])
         plt.legend()
         plt.xlabel("RG step")
         plt.ylabel("Degenerate index $X$")
