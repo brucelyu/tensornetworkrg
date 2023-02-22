@@ -76,6 +76,9 @@ class TensorNetworkRG:
         """
         return self.tensor_magnitude.copy()
 
+    def get_isom(self):
+        return self.isometry_applied.copy()
+
     def get_model_parameters(self):
         """
         return model parameters
@@ -671,7 +674,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
     def hotrg(
         self,
         pars={"chi": 4, "cg_eps": 1e-16,
-              "display": True}
+              "display": True},
+        signFix=False
     ):
         if self.iter_n == 0:
             self.boundary = "parallel"
@@ -680,7 +684,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
         cg_eps = pars["cg_eps"]
         display = pars["display"]
         # use hotrg to coarse graining
-        Aout = self.get_tensor()
+        Aold = self.get_tensor()
+        Aout = Aold * 1.0
         # order of corase graining for three directions
         cg_dirs = ["z", "y", "x"]
         # a dictionary to save all isometric tensors in 3 directions
@@ -710,6 +715,17 @@ class TensorNetworkRG3D(TensorNetworkRG):
                     pname[direction][1], errs[1])
                       )
                 print("----------")
+
+        # (22 Feb. 2023) Sign fixing:
+        if signFix:
+            (
+                Aout,
+                isom3dir
+            ) = hotrg3d.signFix(Aout, isom3dir,
+                                Aold, cg_dirs)
+
+        # update current isometries
+        self.isometry_applied = isom3dir.copy()
         # update the current tensor
         self.current_tensor = Aout * 1.0
         # pull out the tensor norm and save
@@ -722,7 +738,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
         return lrerr, SPerrList
 
     def rgmap(self, tnrg_pars,
-              scheme="hotrg3d", ver="base"):
+              scheme="hotrg3d", ver="base",
+              gaugeFix=False):
         """
         coarse grain the tensors using schemes above
         - hotrg3d
@@ -735,7 +752,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
             if ver == "base":
                 (lferrs,
                  SPerrs
-                 ) = self.hotrg(tnrg_pars)
+                 ) = self.hotrg(tnrg_pars,
+                                signFix=gaugeFix)
         return lferrs, SPerrs
 
     def eval_free_energy(self, initial_spin=1, b=2):

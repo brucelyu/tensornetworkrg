@@ -22,6 +22,7 @@ assumed to be [1, -1, 1, -1, 1, -1].
 
 import numpy as np
 from ncon import ncon
+from . import signfix as sf
 from .. import u1ten
 
 
@@ -335,3 +336,98 @@ def trunc_err_func(eigv, chi):
     """
     res = np.sum(eigv[chi:]) / np.sum(eigv)
     return res
+
+
+# fucntions for sign fixing
+def signFix(Aout, isom3dir, Aold, cg_dirs,
+            verbose=True):
+    """sign fixing procedure for Z2-symmetric tensor
+
+    Args:
+        Aout (TensorZ2): 6-leg coarse tensor
+        isom3dir (dict): isometries
+            - isom3dir["z"] is a list [pzx, pzy] for
+            two isometries during blocking in z direction;
+            - pzx, pzy are both 3-leg TensorZ2 object
+        Aold (TensorZ2): 6-leg old tensor
+        cg_dirs (list): order of the hotrg contraction
+            - for example ["z", "y", "x"] stands for hotrg
+            in z -> y -> x order
+
+    Returns:
+        Aout (TensorZ2): after gauge fixing
+        isom3dir (dict): after gauge fixing
+
+    """
+    # only do the fixing if the shape if
+    # 1) Aout and A have the same shape
+    if (Aout.shape == Aold.shape):
+        if verbose:
+            print("---------------")
+            print("Sign fixing...")
+        (
+            Aout,
+            signx, signy, signz
+        ) = sf.findSigns(Aout, Aold, verbose=verbose)
+        isom3dir = signOnIsoms(isom3dir, signx, signy, signz,
+                               cg_dirs)
+    return Aout, isom3dir
+
+
+def signOnIsoms(isom3dir, signx, signy, signz,
+                cg_dirs):
+    """apply the sign vectors to the outer-most isometries
+    Currently only written for cg_dirs=["z", "y", "x"]
+
+    Args:
+        isom3dir (dict): isometries
+        signx (TensorZ2): sign vector in x-direction
+        cg_dirs (list): order of the hotrg contraction
+            - for example ["z", "y", "x"] stands for hotrg
+            in z -> y -> x order
+
+    Returns:
+        isom3dir: updated version
+
+    """
+    assert cg_dirs == ["z", "y", "x"]
+    isom3dir["y"][1] = (isom3dir["y"][1]).multiply_diag(
+        signx, axis=2, direction="r"
+    )
+    isom3dir["x"][0] = (isom3dir["x"][0]).multiply_diag(
+        signy, axis=2, direction="r"
+    )
+    isom3dir["x"][1] = (isom3dir["x"][1]).multiply_diag(
+        signz, axis=2, direction="r"
+    )
+    return isom3dir
+
+
+# functions for linearization of hotrg
+def fullContr(A, isom3dir, cg_dirs=["z", "y", "x"],
+              comm=None):
+    """One hotrg step, including contractions in 3 directions
+
+    Args:
+        A (TensorCommon): input 6-leg tensor
+        isom3dir (dict): isometries
+
+    Kwargs:
+        comm (MPI.COMM_WORLD): for parallelization
+
+    Returns:
+        Aps (List): [A, A', A'', A''']
+        - Coarse tensors after z-direction,
+        y-direction, and x-direction contractions
+        if we choose z -> y -> x order
+        - final output tensor is Aout = A'''
+
+    """
+    Ap = A * 1.0
+    Aps = []
+    Aps.append(Ap)
+    for direction in cg_dirs:
+        pzx, pzy = isom3dir[direction]
+        Ap = blockAlongZ(Ap, Ap, pzx, pzy, comm=comm)
+        Aps.append(Ap)
+    return Aps
