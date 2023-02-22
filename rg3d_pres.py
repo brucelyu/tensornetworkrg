@@ -49,9 +49,7 @@ def findTc(iter_n=15, Tlow=4.0, Thi=5.0,
         plt.ylabel("Degenerate index $X$")
         plt.savefig(savefile, dpi=300)
 
-    saveDir = (outDir + "{:s}_{:s}_out".format(scheme, ver) + "/" +
-               "chi{:02d}".format(pars["chi"])
-               )
+    saveDir = saveDirName(scheme, ver, pars, outDir)
     if not os.path.exists(saveDir):
         os.makedirs(saveDir)
     # read Tc if exists
@@ -102,6 +100,98 @@ def findTc(iter_n=15, Tlow=4.0, Thi=5.0,
         os.system('rm ' + orgfile)
 
 
-# TODO: generate RG flow at Tc + gauge (sign) fixing
+def generateRGflow(scheme="hotrg3d", ver="base",
+                   pars={}, outDir="./", plotRGmax=15):
+    """generate RG flow at critical temperature
+
+    Kwargs:
+        iter_n (TODO): TODO
+        scheme (TODO): TODO
+        ver (TODO): TODO
+        pars (TODO): TODO
+        outDir (TODO): TODO
+
+    Returns: TODO
+
+    """
+    saveDir = saveDirName(scheme, ver, pars, outDir)
+    # read Tc
+    TcFile = saveDir + "/Tc.pkl"
+    with open(TcFile, "rb") as f:
+        Tlow, Thi = pkl.load(f)
+    Ttry = 0.5 * (Tlow + Thi)
+    # take care of the save directory path
+    if pars["dataDir"] is None:
+        pars["dataDir"] = saveDir
+
+    (
+        XFlow, errMaxFlow,
+        eeFlow, SPerrsFlow, lrerrsFlow
+    ) = benchmark.benm3DIsing(Ttry, h=0,
+                              scheme=scheme, ver=ver,
+                              pars=pars,
+                              gaugeFix=True)
+    tenDir = tensorsDir(pars["dataDir"])
+    tenFile = tenDir + "/tenflows.pkl"
+    with open(tenFile, "rb") as f:
+        alltens = pkl.load(f)
+        Amags, tenDiff, ten3diagDiff = alltens[1:]
+
+    # plot data
+    plotTenDiff(Amags, tenDiff, ten3diagDiff, saveDir,
+                hiRG=plotRGmax)
 
 # TODO: linearize RG map and extracting scaling dimensions
+# functions...
+
+
+# generate directory name for saving
+def saveDirName(scheme, ver, pars, outDir="./",
+                isParal=False):
+    """generate directory name for saving
+
+    """
+    if not isParal:
+        endword = "out"
+    else:
+        endword = "paral"
+    saveDir = (outDir + "{:s}_{:s}_{:s}".format(scheme, ver, endword) +
+               "/" +
+               "chi{:02d}".format(pars["chi"])
+               )
+    return saveDir
+
+
+def tensorsDir(dataDir):
+    return dataDir + "/tensors"
+
+
+def plotTenDiff(Amags, tenDiff, ten3diagDiff, saveDir,
+                hiRG=15):
+    Amags = np.array(Amags)
+    AmagsDiff = np.abs(Amags[2:] - Amags[1:-1]) / Amags[1:-1]
+    plt.figure(figsize=(10, 12))
+    # 1) Difference of the tensor (tensor.norm()=1)
+    ax1 = plt.subplot(311)
+    ax1.plot(tenDiff[:hiRG], "ko--", alpha=0.6)
+    plt.yscale("log")
+    plt.xlabel("RG step $n$")
+    plt.ylabel(r"$\Vert \mathcal{A}^{(n+1)} - \mathcal{A}^{(n)} \Vert$")
+    # 2) sign-independent tensor difference
+    ax2 = plt.subplot(312)
+    ax2.plot(ten3diagDiff[:hiRG], "k.--", alpha=0.6)
+    # plt.title("Sign-independent difference of adjacent tensors")
+    plt.yscale("log")
+    plt.xlabel("RG step $n$")
+    plt.ylabel(r"$\sqrt{\sum_{abc}(\mathcal{A}^{n+1}_{aabbcc} - \mathcal{A}^{n}_{aabbcc})^2} $")
+    # 3) Flow of diff(Anorm)
+    xvalm = min(hiRG, len(Amags[1:]))
+    ax3 = plt.subplot(313)
+    ax3.plot(AmagsDiff[:hiRG], "bx--", alpha=0.6)
+    plt.yscale("log")
+    plt.xticks(np.arange(0, xvalm - 1, 2),
+               np.arange(1, xvalm, 2))
+    plt.ylabel(r"diff($\Vert A^{(n)}\Vert$)")
+    plt.xlabel("RG step $n$")
+    # save
+    plt.savefig(saveDir + "/tenDiffs.png", bbox_inches="tight", dpi=300)

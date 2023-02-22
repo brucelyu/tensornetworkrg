@@ -9,6 +9,7 @@
 import numpy as np
 import os
 import pickle as pkl
+import itertools as itt
 from . import tnrg
 
 
@@ -122,7 +123,7 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
 
 def benm3DIsing(T=5.0, h=0, scheme="hotrg3d",
                 ver="base",
-                pars={}):
+                pars={}, gaugeFix=False):
     """
     Benchmark TNRG schemes on 3D Ising model by generating
     1) local approximation error RG flow
@@ -174,12 +175,14 @@ def benm3DIsing(T=5.0, h=0, scheme="hotrg3d",
         SPerrsFlow, lrerrsFlow
     ) = tnrg3dIterate(ising3d, rg_n, scheme, ver,
                       tnrg_pars=pars, dataDir=pars["dataDir"],
-                      determPhase=pars["determPhase"])
+                      determPhase=pars["determPhase"],
+                      gaugeFix=gaugeFix)
     return XFlow, errMaxFlow, eeFlow, SPerrsFlow, lrerrsFlow
 
 
 def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
-                  tnrg_pars={}, dataDir=None, determPhase=True):
+                  tnrg_pars={}, dataDir=None, determPhase=True,
+                  gaugeFix=False):
     """
     Perform the 3D TNRG iteration
 
@@ -213,12 +216,47 @@ def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
     SPerrsFlow = []
     errMaxFlow = []
     eeFlow = []
+    # save the initial tensor
+    if dataDir is not None:
+        # for taking difference
+        Aorg = tnrg3dCase.get_tensor()
+        # additional data list
+        isom = []
+        tenDiff = []
+        ten3diagDiff = []
+        tenDir = dataDir + "/tensors"
+        fname = "A00.pkl"
+        saveData(tenDir, fname,
+                 data=Aorg
+                 )
+
     for k in range(rg_n):
         (
          lrerrs,
          SPerrs
          ) = tnrg3dCase.rgmap(tnrg_pars,
-                              scheme=scheme, ver=ver)
+                              scheme=scheme, ver=ver,
+                              gaugeFix=gaugeFix)
+        # save updated tesnor
+        if dataDir is not None:
+            fname = "A{:02d}.pkl".format(k + 1)
+            Anew = tnrg3dCase.get_tensor()
+            saveData(tenDir, fname,
+                     data=Anew
+                     )
+            # additional list append
+            isom.append(tnrg3dCase.get_isom())
+            # tensor differnces
+            if (Anew.shape == Aorg.shape):
+                tenDiff.append((Anew - Aorg).norm())
+            else:
+                tenDiff.append(1)
+            # tensor 3-diagonal difference (sign-independent!)
+            ten3diagDiff.append(signIndDiff(Anew, Aorg))
+
+            # update Aorg
+            Aorg = Anew * 1.0
+
         # various properties of the current tensor
         # - Degenerate index:
         #   1 for trivial phase, 2 for Z2-symmetry breaking phase
@@ -266,6 +304,16 @@ def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
             )
             if near1 or near2:
                 break
+    # TODO
+    # save isometries and other tensors
+    if dataDir is not None:
+        fname = "tenflows.pkl"
+        Amags = tnrg3dCase.get_tensor_magnitude()
+        saveData(tenDir, fname,
+                 data=[isom, Amags,
+                       tenDiff, ten3diagDiff
+                       ]
+                 )
     return XFlow, errMaxFlow, eeFlow, SPerrsFlow, lrerrsFlow
 
 
@@ -364,3 +412,28 @@ def plotErrs2(chi, errVList, errHList, gErrList,
     figFile = outDir + "/" + fname
     plt.savefig(figFile, bbox_inches='tight', dpi=300)
 
+
+def signIndDiff(A, Aold):
+    """
+    Difference between two tensors, independent of
+    sign ambiguities
+
+    Only for TensorZ2
+    """
+    if A.shape == Aold.shape:
+        diffsquare = 0
+        for i, j, k in itt.product(range(2), range(2), range(2)):
+            chix = A[(i, i, j, j, k, k)].shape[0]
+            chiy = A[(i, i, j, j, k, k)].shape[2]
+            chiz = A[(i, i, j, j, k, k)].shape[4]
+            for p, m, n in itt.product(
+                    range(chix), range(chiy), range(chiz)
+             ):
+                diffsquare += (
+                    A[(i, i, j, j, k, k)][p, p, m, m, n, n]
+                    - Aold[(i, i, j, j, k, k)][p, p, m, m, n, n]
+                )**2
+        tendiff = np.sqrt(diffsquare)
+    else:
+        tendiff = 1
+    return tendiff
