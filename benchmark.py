@@ -254,9 +254,17 @@ def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
             print("----------")
             print("----------")
         # exit the RG iteration if already flowed to the trivial phase
-        if determPhase:
+        if determPhase and k > 1:
             stop_eps = 0.01
-            if (abs(curX - 1) < stop_eps) or (abs(curX - 2)) < stop_eps:
+            near1 = (
+                (abs(XFlow[-1] - 1) < stop_eps) and
+                (abs(XFlow[-2] - 1) < stop_eps)
+            )
+            near2 = (
+                (abs(XFlow[-1] - 2) < stop_eps) and
+                (abs(XFlow[-2] - 2) < stop_eps)
+            )
+            if near1 or near2:
                 break
     return XFlow, errMaxFlow, eeFlow, SPerrsFlow, lrerrsFlow
 
