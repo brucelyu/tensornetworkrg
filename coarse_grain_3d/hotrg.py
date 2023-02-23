@@ -422,6 +422,83 @@ def fullContr(A, isom3dir, cg_dirs=["z", "y", "x"],
     Aps.append(Ap)
     for direction in cg_dirs:
         pzx, pzy = isom3dir[direction]
-        Ap = blockAlongZ(Ap, Ap, pzx, pzy, comm=comm)
+        Ap = block2tensors(Ap, Ap, pzx, pzy, direction, comm=comm)
         Aps.append(Ap)
     return Aps
+
+
+def linrgmap(deltaA, AstarPiece, isom3dir, cg_dirs=["z", "y", "x"],
+             comm=None):
+    # preparation function: linear HOTRG in a single direction
+    def block2tensorsLinear(deltaA, Astar, pzxstar, pzystar,
+                            direction, comm):
+        deltaAp = (block2tensors(deltaA, Astar,
+                                 pzxstar, pzystar, direction=direction,
+                                 comm=comm) +
+                   block2tensors(Astar, deltaA,
+                                 pzxstar, pzystar, direction=direction,
+                                 comm=comm)
+                   )
+        return deltaAp
+    # start
+    deltaAc = deltaA * 1.0
+    for direction, Astar in zip(cg_dirs, AstarPiece):
+        pzxstar, pzystar = isom3dir[direction]
+        deltaAc = block2tensorsLinear(
+            deltaAc, Astar, pzxstar, pzystar, direction, comm=comm
+        )
+    return deltaAc
+
+
+def get_linearRG(Astar, cgten, comm=None):
+    """
+    Massage the function linrgmap so that we can use
+    the standard sparse linear algebra package
+    to get its eigenvalues
+    -----
+    linrgmap is a map: tensor --> tensor
+    we want to convert it to a map: numpy.array --> numpy.array
+    There are two such maps:
+        - one is map: even charge --> even charge,
+        - the other is map: odd charge --> odd charge
+    """
+    # generate all the middle tensors during a RG step
+    AstarPiece = fullContr(Astar, cgten, comm=comm)
+    AstarPiece = AstarPiece[:-1]
+    # construct linearized RG for both sectors
+
+    # 1) For change-0 (Even) sector
+    AstarArray = u1ten.Z2toArray(Astar)[0]
+    dim_ch0PsiA = AstarArray.shape[0]
+
+    def linearRG0(deltaPsiA):
+        # reshape the numpy array into Z2-symmetric tensor with charge = 0
+        deltaAch0 = u1ten.arraytoZ2(deltaPsiA, Astar)
+        # map from deltaAch0 --> deltaAcch0
+        deltaAcch0 = linrgmap(deltaAch0, AstarPiece, cgten,
+                              comm=comm)
+        # reshape the output deltaAcch0 back into a 1D array
+        deltaPsiAc = u1ten.Z2toArray(deltaAcch0)[0]
+        return deltaPsiAc
+
+    # 2) For charge-1 (Odd) sector
+    # create empty tensor with the same shape as Astar but
+    # with charge = 1
+    Aemptch1 = Astar.empty_like()
+    Aemptch1.charge = 1
+    Aemptch1Array = u1ten.Z2toArray(Aemptch1)[0]
+    dim_ch1PsiA = Aemptch1Array.shape[0]
+
+    # define the response matrix for deltaA with charge = 1
+    def linearRG1(deltaPsiA):
+        # reshape the numpy array into Z2-symmetric tensor with charge = 1
+        deltaAch1 = u1ten.arraytoZ2(deltaPsiA, Aemptch1)
+        # map from deltaAch1 --> deltaAcch1
+        deltaAcch1 = linrgmap(deltaAch1, AstarPiece, cgten,
+                              comm=comm)
+        # reshape the output deltaAcch1 back into a 1D array
+        deltaPsiAc = u1ten.Z2toArray(deltaAcch1)[0]
+        return deltaPsiAc
+    linearRGSet = [linearRG0, linearRG1]
+    dims_PsiA = [dim_ch0PsiA, dim_ch1PsiA]
+    return linearRGSet, dims_PsiA
