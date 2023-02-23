@@ -675,7 +675,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
         self,
         pars={"chi": 4, "cg_eps": 1e-16,
               "display": True},
-        signFix=False
+        signFix=False,
+        comm=None
     ):
         if self.iter_n == 0:
             self.boundary = "parallel"
@@ -699,7 +700,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
              isometries,
              errs
              ) = hotrg3d.dirHOTRG(Aout, chi, direction,
-                                  cg_eps=cg_eps)
+                                  cg_eps=cg_eps,
+                                  comm=comm)
             isom3dir[direction] = isometries
             SPerrList.append(errs)
             if display:
@@ -722,7 +724,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
                 Aout,
                 isom3dir
             ) = hotrg3d.signFix(Aout, isom3dir,
-                                Aold, cg_dirs)
+                                Aold, cg_dirs,
+                                verbose=display)
 
         # update current isometries
         self.isometry_applied = isom3dir.copy()
@@ -739,7 +742,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
 
     def rgmap(self, tnrg_pars,
               scheme="hotrg3d", ver="base",
-              gaugeFix=False):
+              gaugeFix=False,
+              comm=None):
         """
         coarse grain the tensors using schemes above
         - hotrg3d
@@ -753,7 +757,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
                 (lferrs,
                  SPerrs
                  ) = self.hotrg(tnrg_pars,
-                                signFix=gaugeFix)
+                                signFix=gaugeFix,
+                                comm=comm)
         return lferrs, SPerrs
 
     def eval_free_energy(self, initial_spin=1, b=2):

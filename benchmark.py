@@ -123,7 +123,8 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
 
 def benm3DIsing(T=5.0, h=0, scheme="hotrg3d",
                 ver="base",
-                pars={}, gaugeFix=False):
+                pars={}, gaugeFix=False,
+                comm=None):
     """
     Benchmark TNRG schemes on 3D Ising model by generating
     1) local approximation error RG flow
@@ -168,6 +169,8 @@ def benm3DIsing(T=5.0, h=0, scheme="hotrg3d",
         print("TNRG epsilon: --{:.2e}--".format(dtol))
         print("TRNG iteration step: --{:d}--".format(rg_n))
         print("Impose Z2 symmetry? --{}--".format(isZ2))
+        if comm is not None:
+            print("Parallel computation in HOTRG contraction.")
         print("------")
     # generate degenerate index X flow
     (
@@ -176,13 +179,14 @@ def benm3DIsing(T=5.0, h=0, scheme="hotrg3d",
     ) = tnrg3dIterate(ising3d, rg_n, scheme, ver,
                       tnrg_pars=pars, dataDir=pars["dataDir"],
                       determPhase=pars["determPhase"],
-                      gaugeFix=gaugeFix)
+                      gaugeFix=gaugeFix,
+                      comm=comm)
     return XFlow, errMaxFlow, eeFlow, SPerrsFlow, lrerrsFlow
 
 
 def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
                   tnrg_pars={}, dataDir=None, determPhase=True,
-                  gaugeFix=False):
+                  gaugeFix=False, comm=None):
     """
     Perform the 3D TNRG iteration
 
@@ -210,14 +214,21 @@ def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
 
     """
     assert tnrg3dCase.get_iteration() == 0
+
+    # take care of PARAL CODE
+    if comm is None:
+        rank = 0
+    else:
+        rank = comm.Get_rank()
+
     # record rg flows
     XFlow = []
     lrerrsFlow = []
     SPerrsFlow = []
     errMaxFlow = []
     eeFlow = []
-    # save the initial tensor
-    if dataDir is not None:
+    # save the initial tensor and other tensor at rank-0 process
+    if (dataDir is not None) and (rank == 0):
         # for taking difference
         Aorg = tnrg3dCase.get_tensor()
         # additional data list
@@ -236,9 +247,10 @@ def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
          SPerrs
          ) = tnrg3dCase.rgmap(tnrg_pars,
                               scheme=scheme, ver=ver,
-                              gaugeFix=gaugeFix)
-        # save updated tesnor
-        if dataDir is not None:
+                              gaugeFix=gaugeFix,
+                              comm=comm)
+        # save updated tesnor at rank-0 process
+        if (dataDir is not None) and (rank == 0):
             fname = "A{:02d}.pkl".format(k + 1)
             Anew = tnrg3dCase.get_tensor()
             saveData(tenDir, fname,
@@ -304,9 +316,8 @@ def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
             )
             if near1 or near2:
                 break
-    # TODO
-    # save isometries and other tensors
-    if dataDir is not None:
+    # save isometries and other tensors at rank-0 process
+    if (dataDir is not None) and (rank == 0):
         fname = "tenflows.pkl"
         Amags = tnrg3dCase.get_tensor_magnitude()
         saveData(tenDir, fname,
