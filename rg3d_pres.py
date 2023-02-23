@@ -15,7 +15,10 @@ import matplotlib.pyplot as plt
 import os
 import itertools
 import pickle as pkl
-from . import benchmark
+from datetime import datetime
+import time
+from . import benchmark, tnrg
+from .coarse_grain_3d import hotrg as hotrg3d
 
 
 def findTc(iter_n=15, Tlow=4.0, Thi=5.0,
@@ -175,8 +178,152 @@ def generateRGflow(scheme="hotrg3d", ver="base",
         plotTenDiff(Amags, tenDiff, ten3diagDiff, saveDir,
                     Ttry, hiRG=plotRGmax)
 
-# TODO: linearize RG map and extracting scaling dimensions
-# functions...
+
+# linearize RG map and extracting scaling dimensions
+def linRG2scaleD(scheme="hotrg3d", ver="base", pars={},
+                 rgstart=1, rgend=9,
+                 evenN=10, oddN=10,
+                 outDir="./", comm=None):
+    def fixMagTen(A, Amag):
+        # fix the tensor norm (optional)
+        return A * (Amag**(-1/7))
+
+    # take care of PARAL CODE
+    if comm is None:
+        rank = 0
+    else:
+        rank = comm.Get_rank()
+
+    saveDir = saveDirName(scheme, ver, pars, outDir,
+                          comm=comm)
+
+    # take care of the save directory path
+    if pars["dataDir"] is None:
+        pars["dataDir"] = saveDir
+    # read isometry tensors and magnituites of A at rank-0 process
+    tenDir = tensorsDir(pars["dataDir"])
+    isom, Amags = 0, 0
+    if rank == 0:
+        scDEvenExt = [0, 1.413, 2.413, 2.413, 2.413,
+                      3, 3, 3, 3, 3]
+        scDOddExt = [0.518, 1.518, 1.518, 1.518,
+                     2.518, 2.518, 2.518, 2.518, 2.518, 2.518]
+        tenFile = tenDir + "/tenflows.pkl"
+        with open(tenFile, "rb") as f:
+            alltens = pkl.load(f)
+            isom, Amags = alltens[:2]
+    # broadcast isom and Amags
+    if comm is not None:
+        isom = comm.bcast(isom, rank=0)
+        Amags = comm.bcast(Amags, rank=0)
+
+    # %%%%%%%%%%%%%%%%%%%%%%%%%% \
+    # calculate scaling dimensions \
+    if rank == 0:
+        # Print out the time when the script is executed
+        now = datetime.now()
+        current_time = now.strftime("%Y-%m-%d. %H:%M:%S")
+        print("Running Time =", current_time)
+        print("Perform the tensor RG prescription using",
+              "{:s}-{:s}".format(scheme, ver))
+    # list to save scaling dimensions
+    rgsteps = []
+    scDList = []
+    for k in range(rgstart, rgend):
+        if rank == 0:
+            print("/--------------------\\")
+            print("For {}-th to {}-th RG step...".format(k, k+1))
+            # start time
+            startT = time.time()
+        # read out the fixed-point tensor
+        AcurFile = tenDir + "/A{:02d}.pkl".format(k)
+        AnxtFile = tenDir + "/A{:02d}.pkl".format(k + 1)
+        with open(AcurFile, "rb") as f:
+            Acur = pkl.load(f)
+        with open(AnxtFile, "rb") as f:
+            Anxt = pkl.load(f)
+
+        # make sure Anxt and Acur are of same shape
+        if Anxt.shape == Acur.shape:
+            # save k
+            rgsteps.append(k)
+            # check isometry correctness
+            AoutCheck = hotrg3d.fullContr(Acur, isom[k], comm=comm)[-1]
+            AoutCheck = AoutCheck / AoutCheck.norm()
+            checkDiff = (AoutCheck - Anxt).norm()
+            errMsg = ("isometries have wrong gauge!" +
+                      "(Check Difference is {:.2e})".format(checkDiff)
+                      )
+            assert checkDiff < 1e-10, errMsg
+        else:
+            if rank == 0:
+                print("The shape of the tensor changes in the RG.")
+                print("Skip!!")
+            # skip this iteration
+            continue
+        # fix the norm of the tensor (optional)
+        Astar = fixMagTen(Acur, Amags[k])
+        # find scaling dimensions
+        scDims = linRG2x(
+            Astar, isom[k], scheme="hotrg3d", ver="base",
+            nscaleD=[evenN, oddN], comm=comm)
+
+        # save scaling dimensions
+        scDList.append(scDims)
+        # print out scaling dimensions and time elapsed
+        if rank == 0:
+            # end time
+            endT = time.time()
+            diffT = endT - startT
+            print("finished! Time elapsed = {:.2f}".format(diffT))
+            print("The scaling dimensions of even operators are:")
+            with np.printoptions(precision=5, suppress=True):
+                print(scDims[0])
+            print("The Exact values for 3D Ising even sector are")
+            with np.printoptions(precision=5, suppress=True):
+                print(scDEvenExt)
+            print("----------")
+            print("The scaling dimensions of odd operators are:")
+            with np.printoptions(precision=5, suppress=True):
+                print(scDims[1])
+            print("The Exact values for 3D Ising odd sector are")
+            with np.printoptions(precision=5, suppress=True):
+                print(scDOddExt)
+            print("\\--------------------/")
+    # save scaling dimensions
+    if rank == 0:
+        scDFile = tenDir + "/scDimSep.pkl"
+        with open(scDFile, "wb") as f:
+            pkl.dump([rgsteps, scDList], f)
+
+
+def linRG2x(Astar, cgtens, scheme="hotrg3d", ver="base",
+            nscaleD=[10, 10], comm=None):
+    """scaling dimensions from linearized RG equation
+    Currently only design for 3d HOTRG
+
+    Args:
+        Astar (TensorZ2): fixed-point tensor
+        cgtens : tensors to coarse grain Astar
+
+    Kwargs:
+        scheme (str): tnrg scheme
+        ver (str): version
+        nscaleD (list): number of scaling dimensions to get
+        comm (MPI.COMM_WORLD): for parallelization
+
+    """
+    ising3d = tnrg.TensorNetworkRG("ising3d")
+    linearRGSet, dims_PsiA = hotrg3d.get_linearRG(Astar, cgtens,
+                                                  comm=comm)
+    scDimsEven, baseEig = ising3d.linearRG2scaleD(
+        linearRGSet[0], dims_PsiA[0], nscaleD[0], baseEig=None
+    )
+    scDimsOdd = ising3d.linearRG2scaleD(
+        linearRGSet[1], dims_PsiA[1], nscaleD[1], baseEig=baseEig
+    )
+    scDims = [scDimsEven, scDimsOdd]
+    return scDims
 
 
 # generate directory name for saving
@@ -200,6 +347,7 @@ def tensorsDir(dataDir):
     return dataDir + "/tensors"
 
 
+# for plotting
 def plotTenDiff(Amags, tenDiff, ten3diagDiff, saveDir,
                 Ttry, hiRG=15):
     Amags = np.array(Amags)
@@ -230,3 +378,5 @@ def plotTenDiff(Amags, tenDiff, ten3diagDiff, saveDir,
     plt.xlabel("RG step $n$")
     # save
     plt.savefig(saveDir + "/tenDiffs.png", bbox_inches="tight", dpi=300)
+
+def plotscaleD(rgsteps, scDList)
