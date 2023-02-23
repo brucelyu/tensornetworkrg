@@ -20,7 +20,8 @@ from . import benchmark
 
 def findTc(iter_n=15, Tlow=4.0, Thi=5.0,
            scheme="hotrg3d", ver="base",
-           pars={}, outDir="./"):
+           pars={}, outDir="./",
+           comm=None):
     # helper function 1: Is hi-T phase or low-T phase?
     def ishiT(x):
         dist2hi = np.abs(x - 1)
@@ -49,36 +50,56 @@ def findTc(iter_n=15, Tlow=4.0, Thi=5.0,
         plt.ylabel("Degenerate index $X$")
         plt.savefig(savefile, dpi=300)
 
-    saveDir = saveDirName(scheme, ver, pars, outDir)
-    if not os.path.exists(saveDir):
+    # take care of PARAL CODE
+    if comm is None:
+        rank = 0
+    else:
+        rank = comm.Get_rank()
+    # directory name for saving
+    saveDir = saveDirName(scheme, ver, pars, outDir,
+                          comm=comm)
+    if (not os.path.exists(saveDir)) and (rank == 0):
         os.makedirs(saveDir)
-    # read Tc if exists
+    # read Tc if exists at rank-0 process
     TcFile = saveDir + "/Tc.pkl"
-    if os.path.exists(TcFile):
+    if os.path.exists(TcFile) and (rank == 0):
         with open(TcFile, "rb") as f:
             Tlow, Thi = pkl.load(f)
+    # PARAL CODE: broadcast Tlow and Thi
+    if comm is not None:
+        Tlow = comm.bcast(Tlow, root=0)
+        Thi = comm.bcast(Thi, root=0)
     # enter the bisection
     Xlow = benchmark.benm3DIsing(Tlow, h=0,
                                  scheme=scheme, ver=ver,
-                                 pars=pars)[0]
+                                 pars=pars,
+                                 comm=comm)[0]
     Xhi = benchmark.benm3DIsing(Thi, h=0,
                                 scheme=scheme, ver=ver,
-                                pars=pars)[0]
-    plt.figure()
-    lines = itertools.cycle(("--", "-.", "-"))
+                                pars=pars,
+                                comm=comm)[0]
+    # ---------------------\
+    # plot at rank-0 process
+    if rank == 0:
+        plt.figure()
+        lines = itertools.cycle(("--", "-.", "-"))
+    # ---------------------/
     for k in range(iter_n + 1):
         # generate trial degenerate index X flow
         Ttry = 0.5 * (Tlow + Thi)
         Xtry = benchmark.benm3DIsing(Ttry, h=0,
                                      scheme=scheme, ver=ver,
-                                     pars=pars)[0]
-        # plot every 3 iteration
-        if k % 3 == 0:
+                                     pars=pars,
+                                     comm=comm)[0]
+        # ------\
+        # plot every 3 iteration at rank-0 process
+        if (k % 3 == 0) and (rank == 0):
             curline = next(lines)
             saveFigName = saveDir + "/X_iterk{:02d}.png".format(k+1)
             plotXFlows(Xlow, Xhi, Xtry,
                        Tlow, Thi, Ttry,
                        saveFigName, curline, alpha=(k+1)/(iter_n+1))
+        # ------/
         # update low and high bound
         if ishiT(Xtry[-1]):
             Thi = Ttry
@@ -86,40 +107,49 @@ def findTc(iter_n=15, Tlow=4.0, Thi=5.0,
         else:
             Tlow = Ttry
             Xlow = Xtry.copy()
+    # -------\
     # save Tc
     # save the lower and upper bound of Tc
-    with open(TcFile, "wb") as f:
-        pkl.dump([Tlow, Thi], f)
-    # Append all figures
-    orgfile = saveDir + '/X_iterk*.png'
-    tarfile = saveDir + '/Xflow_all.png'
-    syscommand = 'convert ' + orgfile + " -append " + tarfile
-    if os.system(syscommand) != 0:
-        print("Command, convert, not found in current os")
-    else:
-        os.system('rm ' + orgfile)
+    # at rank-0 process
+    if rank == 0:
+        with open(TcFile, "wb") as f:
+            pkl.dump([Tlow, Thi], f)
+        # Append all figures
+        orgfile = saveDir + '/X_iterk*.png'
+        tarfile = saveDir + '/Xflow_all.png'
+        syscommand = 'convert ' + orgfile + " -append " + tarfile
+        if os.system(syscommand) != 0:
+            print("Command, convert, not found in current os")
+        else:
+            os.system('rm ' + orgfile)
+    # -------/
 
 
 def generateRGflow(scheme="hotrg3d", ver="base",
-                   pars={}, outDir="./", plotRGmax=15):
+                   pars={}, outDir="./", plotRGmax=15,
+                   comm=None):
     """generate RG flow at critical temperature
 
-    Kwargs:
-        iter_n (TODO): TODO
-        scheme (TODO): TODO
-        ver (TODO): TODO
-        pars (TODO): TODO
-        outDir (TODO): TODO
-
-    Returns: TODO
-
     """
-    saveDir = saveDirName(scheme, ver, pars, outDir)
-    # read Tc
+    # take care of PARAL CODE
+    if comm is None:
+        rank = 0
+    else:
+        rank = comm.Get_rank()
+
+    saveDir = saveDirName(scheme, ver, pars, outDir,
+                          comm=comm)
+    # read Tc at rank-0 process
     TcFile = saveDir + "/Tc.pkl"
-    with open(TcFile, "rb") as f:
-        Tlow, Thi = pkl.load(f)
-    Ttry = 0.5 * (Tlow + Thi)
+    Ttry = 0.0  # initialization
+    if rank == 0:
+        with open(TcFile, "rb") as f:
+            Tlow, Thi = pkl.load(f)
+        Ttry = 0.5 * (Tlow + Thi)
+    # broadcast Ttry
+    if comm is not None:
+        Ttry = comm.bcast(Ttry, root=0)
+
     # take care of the save directory path
     if pars["dataDir"] is None:
         pars["dataDir"] = saveDir
@@ -130,16 +160,20 @@ def generateRGflow(scheme="hotrg3d", ver="base",
     ) = benchmark.benm3DIsing(Ttry, h=0,
                               scheme=scheme, ver=ver,
                               pars=pars,
-                              gaugeFix=True)
-    tenDir = tensorsDir(pars["dataDir"])
-    tenFile = tenDir + "/tenflows.pkl"
-    with open(tenFile, "rb") as f:
-        alltens = pkl.load(f)
-        Amags, tenDiff, ten3diagDiff = alltens[1:]
-
-    # plot data
-    plotTenDiff(Amags, tenDiff, ten3diagDiff, saveDir,
-                Ttry, hiRG=plotRGmax)
+                              gaugeFix=True,
+                              comm=comm)
+    # Read and plot the flow of tensor difference
+    # generate in `benm3DIsing` process
+    # at rank-0 process
+    if rank == 0:
+        tenDir = tensorsDir(pars["dataDir"])
+        tenFile = tenDir + "/tenflows.pkl"
+        with open(tenFile, "rb") as f:
+            alltens = pkl.load(f)
+            Amags, tenDiff, ten3diagDiff = alltens[1:]
+        # plot data
+        plotTenDiff(Amags, tenDiff, ten3diagDiff, saveDir,
+                    Ttry, hiRG=plotRGmax)
 
 # TODO: linearize RG map and extracting scaling dimensions
 # functions...
@@ -147,11 +181,11 @@ def generateRGflow(scheme="hotrg3d", ver="base",
 
 # generate directory name for saving
 def saveDirName(scheme, ver, pars, outDir="./",
-                isParal=False):
+                comm=None):
     """generate directory name for saving
 
     """
-    if not isParal:
+    if comm is None:
         endword = "out"
     else:
         endword = "paral"
