@@ -97,12 +97,6 @@ def block2tensors(A, B, pzx, pzy, direction,
             where the . schematically denote
             tensor contraction
     """
-    # For Parallel computation, broadcast the input tensors: A, B, pzx, pzy
-    if comm is not None:
-        A = comm.bcast(A, root=0)
-        B = comm.bcast(B, root=0)
-        pzx = comm.bcast(pzx, root=0)
-        pzy = comm.bcast(pzy, root=0)
     # Rotate the order of the legs of A and B to the right position
     perm, inv_perm = rotInd(direction)
     Arot = A.transpose(perm)
