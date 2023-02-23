@@ -6,6 +6,7 @@
 # Last Modified Date: 20.05.2022
 # Last Modified By  : Xinliang(Bruce) Lyu <lyu@issp.u-tokyo.ac.jp>
 
+from scipy.sparse.linalg import eigs, LinearOperator
 import scipy.stats as spstats
 import numpy as np
 from abeliantensors import TensorZ2, Tensor
@@ -14,6 +15,7 @@ from .initial_tensor import initial_tensor
 from .coarse_grain_2d import trg_evenbly, tnr_evenbly, hotrg
 from .coarse_grain_3d import hotrg as hotrg3d
 from .loop_filter import cleanLoop, toymodels
+from . import u1ten
 
 
 class TensorNetworkRG:
@@ -159,6 +161,50 @@ class TensorNetworkRG:
         self.iter_n += 1
         assert len(self.tensor_magnitude) == (self.iter_n + 1)
     # ------------------------- #
+
+    @staticmethod
+    def linearRG2scaleD(linearRG, dim_psiA, N_scaleD, baseEig=None,
+                        b=2, d=3):
+        """
+        Diagonalize the linearized RG equation specified by responseMatFun
+        to calculate the first N_scaleD scaling dimensions
+        Parameters
+        ----------
+        responseMatFun : a linear map
+            deltaPsiA --> deltaPsiAc, from a 1D array to another
+        dim_psiA : int
+            dimensinality of the 1D array deltaPsiA and deltaPsiAc:
+                len(deltaPsiA)
+        N_scaleD : int
+            number of scaling dimensions to extract
+        baseEig: float
+            eigenvalue of the identity operator = b^d
+        b: int
+            rescaling factor of the RG map
+        d: int
+            spacial dimension
+        """
+        # diagonalize the linearized RG map
+        hyperOp = LinearOperator((dim_psiA,) * 2, matvec=linearRG)
+        eigVals = np.sort(
+            abs(
+                eigs(hyperOp, k=N_scaleD,
+                     which='LM', return_eigenvectors=False)
+            )
+        )
+        eigVals = eigVals[::-1]
+
+        # input fixed-point tensor has the correct norm (not used here)
+        # see standard textbook for this formula
+        # scDims = d - np.log(abs(eigVals)) / np.log(b)
+
+        # We fixed the identity operator scaling dimension to 0
+        if baseEig is None:
+            scDims = -np.log(abs(eigVals/eigVals[0])) / np.log(b)
+            return scDims, eigVals[0]
+        else:
+            scDims = -np.log(abs(eigVals/baseEig)) / np.log(b)
+            return scDims
 
 
 class TensorNetworkRG2D(TensorNetworkRG):
