@@ -381,3 +381,61 @@ def loopleg(ten, posleg):
         for curq, degN in zip(legQhape, legShape):
             for degind in range(degN):
                 yield (curq, degind)
+
+
+# ------------------------ #
+# convert from TensorZ2 to ordinary tensor
+# used for TNRG linearalization
+def Z2toArray(Z2tensor):
+    """Z2toArray.
+    Reshape a Z2-symmetric tensor into a numpy Array
+    Parameters
+    ----------
+    Z2tensor : abeliantensors
+        The input tensor
+    Returns
+    -------
+    tensorArray : numpy Array
+    """
+    # read off the charge of the tensor
+    symmetryCharge = Z2tensor.charge
+    # read off the number of legs of the tensor
+    numLeg = len(Z2tensor.shape)
+    # Merge all legs of Z2tensor to a single leg
+    tensorArrayZ2 = Z2tensor.join_indices([i for i in range(numLeg)], dirs=1)
+    # Read off the numpy Array from the corresponding sector
+    tensorArray = tensorArrayZ2[(symmetryCharge,)]
+    return tensorArray, tensorArrayZ2
+
+
+def arraytoZ2(tensorArray, exemZ2tensor):
+    """arraytoZ2.
+    Reshape a numpy Array into a Z2-symmetric tensor with
+    the same shape of the exemplary tensor exemZ2tensor
+    Parameters
+    ----------
+    tensorArray : numpy Array
+        input array to be reshaped
+    exemZ2tensor : abeliantensors
+        exemplary tensor
+    Returns
+    -------
+    Z2tensor : abeliantensors
+    """
+    # read off related property from the exemplary tensor
+    symmetryCharge = exemZ2tensor.charge
+    symShape = exemZ2tensor.shape
+    symQhape = exemZ2tensor.qhape
+    symDirs = exemZ2tensor.dirs
+    # produce an exemplary numpy array from exemZ2tensor
+    exemArray, exemArrayZ2 = Z2toArray(exemZ2tensor)
+    # impose the condition that len(tensorArray) == len(exemArray)
+    errMessg = ("The length of tensorArray should match " +
+                "the degrees of freedom in exemZ2tensor!")
+    assert len(tensorArray) == len(exemArray), errMessg
+    # Assign tensorArray to the corresponding sector in exemArrayZ2
+    exemArrayZ2[(symmetryCharge,)] = tensorArray
+    # split the leg
+    Z2tensor = exemArrayZ2.split_indices(indices=[0], dims=[symShape],
+                                         qims=[symQhape], dirs=[symDirs])
+    return Z2tensor
