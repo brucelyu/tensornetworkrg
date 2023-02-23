@@ -139,7 +139,7 @@ def generateRGflow(scheme="hotrg3d", ver="base",
 
     # plot data
     plotTenDiff(Amags, tenDiff, ten3diagDiff, saveDir,
-                hiRG=plotRGmax)
+                Ttry, hiRG=plotRGmax)
 
 # TODO: linearize RG map and extracting scaling dimensions
 # functions...
@@ -167,13 +167,14 @@ def tensorsDir(dataDir):
 
 
 def plotTenDiff(Amags, tenDiff, ten3diagDiff, saveDir,
-                hiRG=15):
+                Ttry, hiRG=15):
     Amags = np.array(Amags)
     AmagsDiff = np.abs(Amags[2:] - Amags[1:-1]) / Amags[1:-1]
     plt.figure(figsize=(10, 12))
     # 1) Difference of the tensor (tensor.norm()=1)
     ax1 = plt.subplot(311)
     ax1.plot(tenDiff[:hiRG], "ko--", alpha=0.6)
+    plt.title("At temperature {:.5f}".format(Ttry))
     plt.yscale("log")
     plt.xlabel("RG step $n$")
     plt.ylabel(r"$\Vert \mathcal{A}^{(n+1)} - \mathcal{A}^{(n)} \Vert$")
