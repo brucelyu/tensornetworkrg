@@ -290,11 +290,13 @@ def linRG2scaleD(scheme="hotrg3d", ver="base", pars={},
             with np.printoptions(precision=5, suppress=True):
                 print(scDOddExt)
             print("\\--------------------/")
-    # save scaling dimensions
     if rank == 0:
+        # save scaling dimensions
         scDFile = tenDir + "/scDimSep.pkl"
         with open(scDFile, "wb") as f:
             pkl.dump([rgsteps, scDList], f)
+        # plot scaling dimensions
+        plotscaleD(rgsteps, scDList, saveDir, pars)
 
 
 def linRG2x(Astar, cgtens, scheme="hotrg3d", ver="base",
@@ -379,5 +381,62 @@ def plotTenDiff(Amags, tenDiff, ten3diagDiff, saveDir,
     # save
     plt.savefig(saveDir + "/tenDiffs.png", bbox_inches="tight", dpi=300)
 
-def plotscaleD(rgsteps, scDList):
-    pass
+
+def plotscaleD(rgsteps, scDList,
+               saveDir, pars):
+    # markers
+    evenMarker = [".", "o", "+", "+", "+", "s", "s", "s", "s", "s"]
+    evenColor = ["k", "k", "b", "b", "b", "k", "k", "k", "k", "k"]
+    evenShift = [0, 0, -0.1, 0, 0.1, -0.2, -0.1, 0, 0.1, 0.2]
+    oddMarker = ["o", "+", "+", "+", "x", "x", "x", "x", "x", "x"]
+    oddColor = ["k", "b", "b", "b", "b", "b", "b", "b", "b", "b"]
+    oddShift = [0, -0.1, 0, 0.1, -0.25, -0.15, -0.05, 0.05, 0.15, 0.25]
+
+    plt.figure(figsize=(12, 8))
+    ax1 = plt.subplot(211)
+    for rgn, scD in zip(rgsteps, scDList):
+        for k in range(10):
+            ax1.plot(rgn + evenShift[k], scD[0][k],
+                     evenColor[k] + evenMarker[k])
+    # best-known values
+    plt.hlines(1.412625, rgsteps[0]-0.2, rgsteps[-1]+0.2,
+               colors="black", linestyles="solid", alpha=0.2)
+    plt.hlines(2.412625, rgsteps[0]-0.2, rgsteps[-1]+0.2,
+               colors="blue", linestyles="solid", alpha=0.2)
+    plt.hlines(3, rgsteps[0]-0.2, rgsteps[-1]+0.2,
+               colors="black", linestyles="solid", alpha=0.2)
+    # set axis ranges
+    plt.xticks(rgsteps)
+    plt.ylim([-0.1, 3.4])
+    plt.ylabel("Scaling dimensions")
+    # put explanations on the figure
+    plt.text(rgsteps[0] + 0.4, 1.41 - 0.25, r"$\epsilon$", size=14)
+    plt.text(rgsteps[0] + 0.4, 3 - 0.25, r"$T_{ij}$", size=14)
+    plt.text(rgsteps[0] + 0.38, 2.41 - 0.25, r"$\partial_i \epsilon$",
+             size=14, color="blue")
+    plt.text(rgsteps[-1] - 1, 0.5,
+             r"Bond dimension $\chi$={:d}".format(pars["chi"]),
+             fontsize=14)
+
+    ax2 = plt.subplot(212)
+    for rgn, scD in zip(rgsteps, scDList):
+        for k in range(10):
+            ax2.plot(rgn + oddShift[k], scD[1][k],
+                     oddColor[k] + oddMarker[k])
+    plt.hlines(0.5181489, rgsteps[0]-0.2, rgsteps[-1]+0.2,
+               colors="black", linestyles="solid", alpha=0.2)
+    plt.hlines(1.5181489, rgsteps[0]-0.2, rgsteps[-1]+0.2,
+               colors="blue", linestyles="solid", alpha=0.2)
+    plt.hlines(2.5181489, rgsteps[0]-0.2, rgsteps[-1]+0.2,
+               colors="blue", linestyles="solid", alpha=0.2)
+    plt.xticks(rgsteps)
+    plt.ylim([-0.1, 3.0])
+    plt.ylabel("Scaling dimensions")
+    plt.xlabel("RG step")
+    plt.text(rgsteps[0] + 0.4, 0.518 - 0.2, r"$\sigma$", size=14)
+    plt.text(rgsteps[0] + 0.35, 1.518 - 0.2, r"$\partial_i\sigma$",
+             size=14, color="blue")
+    plt.text(rgsteps[0] + 0.3, 2.518 - 0.2,
+             r"$\partial_i \partial_j \sigma$", size=14, color="blue")
+    plt.savefig(saveDir + "/scDim.png",
+                bbox_inches='tight', dpi=300)
