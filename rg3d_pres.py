@@ -214,8 +214,8 @@ def linRG2scaleD(scheme="hotrg3d", ver="base", pars={},
             isom, Amags = alltens[:2]
     # broadcast isom and Amags
     if comm is not None:
-        isom = comm.bcast(isom, rank=0)
-        Amags = comm.bcast(Amags, rank=0)
+        isom = comm.bcast(isom, root=0)
+        Amags = comm.bcast(Amags, root=0)
 
     # %%%%%%%%%%%%%%%%%%%%%%%%%% \
     # calculate scaling dimensions \
