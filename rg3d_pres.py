@@ -379,4 +379,5 @@ def plotTenDiff(Amags, tenDiff, ten3diagDiff, saveDir,
     # save
     plt.savefig(saveDir + "/tenDiffs.png", bbox_inches="tight", dpi=300)
 
-def plotscaleD(rgsteps, scDList)
+def plotscaleD(rgsteps, scDList):
+    pass
