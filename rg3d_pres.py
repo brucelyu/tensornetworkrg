@@ -76,11 +76,11 @@ def findTc(iter_n=15, Tlow=4.0, Thi=5.0,
     Xlow = benchmark.benm3DIsing(Tlow, h=0,
                                  scheme=scheme, ver=ver,
                                  pars=pars,
-                                 comm=comm)[0]
+                                 comm=comm, noEE=True)[0]
     Xhi = benchmark.benm3DIsing(Thi, h=0,
                                 scheme=scheme, ver=ver,
                                 pars=pars,
-                                comm=comm)[0]
+                                comm=comm, noEE=True)[0]
     # ---------------------\
     # plot at rank-0 process
     if rank == 0:
@@ -93,7 +93,7 @@ def findTc(iter_n=15, Tlow=4.0, Thi=5.0,
         Xtry = benchmark.benm3DIsing(Ttry, h=0,
                                      scheme=scheme, ver=ver,
                                      pars=pars,
-                                     comm=comm)[0]
+                                     comm=comm, noEE=True)[0]
         # ------\
         # plot every 3 iteration at rank-0 process
         if (k % 3 == 0) and (rank == 0):

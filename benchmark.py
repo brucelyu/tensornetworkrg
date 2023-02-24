@@ -124,7 +124,7 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
 def benm3DIsing(T=5.0, h=0, scheme="hotrg3d",
                 ver="base",
                 pars={}, gaugeFix=False,
-                comm=None):
+                comm=None, noEE=False):
     """
     Benchmark TNRG schemes on 3D Ising model by generating
     1) local approximation error RG flow
@@ -180,13 +180,14 @@ def benm3DIsing(T=5.0, h=0, scheme="hotrg3d",
                       tnrg_pars=pars, dataDir=pars["dataDir"],
                       determPhase=pars["determPhase"],
                       gaugeFix=gaugeFix,
-                      comm=comm)
+                      comm=comm, noEE=noEE)
     return XFlow, errMaxFlow, eeFlow, SPerrsFlow, lrerrsFlow
 
 
 def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
                   tnrg_pars={}, dataDir=None, determPhase=True,
-                  gaugeFix=False, comm=None):
+                  gaugeFix=False, comm=None,
+                  noEE=False):
     """
     Perform the 3D TNRG iteration
 
@@ -274,10 +275,13 @@ def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
         #   1 for trivial phase, 2 for Z2-symmetry breaking phase
         curX = tnrg3dCase.degIndX()
         # - Various entanglement entropy
-        eex = tnrg3dCase.entangle(leg="x")[0]
-        eey = tnrg3dCase.entangle(leg="y")[0]
-        eez = tnrg3dCase.entangle(leg="z")[0]
-        eexyz = tnrg3dCase.entangle(leg="xyz")[0]
+        if noEE:
+            eex, eey, eez, eexyz = [None] * 4
+        else:
+            eex = tnrg3dCase.entangle(leg="x")[0]
+            eey = tnrg3dCase.entangle(leg="y")[0]
+            eez = tnrg3dCase.entangle(leg="z")[0]
+            eexyz = tnrg3dCase.entangle(leg="xyz")[0]
         # maximal RG replacement errors of all 3*2=6 squeezers
         errMax = np.max(SPerrs)
         # cur_g = tnrg3dCase.eval_free_energy()
