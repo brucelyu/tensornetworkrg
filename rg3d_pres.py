@@ -299,8 +299,132 @@ def linRG2scaleD(scheme="hotrg3d", ver="base", pars={},
         plotscaleD(rgsteps, scDList, saveDir, pars)
 
 
+def linRG2scaleD1rg(scheme="hotrg3d", ver="base", pars={},
+                    rgn=3, scaleN=10, outDir="./", comm=None,
+                    sectorChoice="even"):
+    def fixMagTen(A, Amag):
+        # fix the tensor norm (optional)
+        return A * (Amag**(-1/7))
+
+    # take care of PARAL CODE
+    if comm is None:
+        rank = 0
+    else:
+        rank = comm.Get_rank()
+
+    saveDir = saveDirName(scheme, ver, pars, outDir,
+                          comm=comm)
+
+    # take care of the save directory path
+    if pars["dataDir"] is None:
+        pars["dataDir"] = saveDir
+    # read isometry tensors and magnituites of A at rank-0 process
+    tenDir = tensorsDir(pars["dataDir"])
+    isom, Amags = 0, 0
+    if rank == 0:
+        scDEvenExt = [0, 1.413, 2.413, 2.413, 2.413,
+                      3, 3, 3, 3, 3]
+        scDOddExt = [0.518, 1.518, 1.518, 1.518,
+                     2.518, 2.518, 2.518, 2.518, 2.518, 2.518]
+        tenFile = tenDir + "/tenflows.pkl"
+        with open(tenFile, "rb") as f:
+            alltens = pkl.load(f)
+            isom, Amags = alltens[:2]
+    # broadcast isom and Amags
+    if comm is not None:
+        isom = comm.bcast(isom, root=0)
+        Amags = comm.bcast(Amags, root=0)
+
+    # %%%%%%%%%%%%%%%%%%%%%%%%%% \
+    # calculate scaling dimensions \
+    Acur, Anxt = 0, 0
+    if rank == 0:
+        # Print out the time when the script is executed
+        now = datetime.now()
+        current_time = now.strftime("%Y-%m-%d. %H:%M:%S")
+        print("Running Time =", current_time)
+        print("Perform the tensor RG prescription using",
+              "{:s}-{:s}".format(scheme, ver))
+        print("/--------------------\\")
+        print("For {}-th to {}-th RG step...".format(rgn, rgn+1))
+        # start time
+        startT = time.time()
+        # read out the fixed-point tensor
+        AcurFile = tenDir + "/A{:02d}.pkl".format(rgn)
+        AnxtFile = tenDir + "/A{:02d}.pkl".format(rgn + 1)
+        with open(AcurFile, "rb") as f:
+            Acur = pkl.load(f)
+        with open(AnxtFile, "rb") as f:
+            Anxt = pkl.load(f)
+    # broadcast Acur and Anxt
+    if comm is not None:
+        Acur = comm.bcast(Acur, root=0)
+        Anxt = comm.bcast(Anxt, root=0)
+
+    # make sure Anxt and Acur are of same shape
+    if Anxt.shape == Acur.shape:
+        # check isometry correctness
+        AoutCheck = hotrg3d.fullContr(Acur, isom[rgn], comm=comm)[-1]
+        AoutCheck = AoutCheck / AoutCheck.norm()
+        checkDiff = (AoutCheck - Anxt).norm()
+        errMsg = ("isometries have wrong gauge!" +
+                  "(Check Difference is {:.2e})".format(checkDiff)
+                  )
+        assert checkDiff < 1e-10, errMsg
+    else:
+        if rank == 0:
+            print("The shape of the tensor changes in the RG.")
+            print("Skip!!")
+        return None
+
+    # fix the norm of the tensor (optional)
+    Astar = fixMagTen(Acur, Amags[rgn])
+    # read the base eigenvalue
+    if sectorChoice == "even":
+        sector = [sectorChoice, None]
+    elif sectorChoice == "odd":
+        baseEig = 1
+        if rank == 0:
+            scDFile = tenDir + "/scDim-rg{:02d}-even.pkl".format(rgn)
+            with open(scDFile, "rb") as f:
+                baseEig = pkl.load(f)[2]
+        if comm is not None:
+            baseEig = comm.bcast(baseEig, root=0)
+        sector = [sectorChoice, baseEig]
+    # find scaling dimensions
+    scDims, baseEig = linRG2x(
+        Astar, isom[rgn], scheme="hotrg3d", ver="base",
+        nscaleD=scaleN, comm=comm, sector=sector)
+
+    # print out scaling dimensions and time elapsed
+    if rank == 0:
+        # end time
+        endT = time.time()
+        diffT = endT - startT
+        print("finished! Time elapsed = {:.2f}".format(diffT))
+        if sector[0] == "even":
+            print("The scaling dimensions of even operators are:")
+            with np.printoptions(precision=5, suppress=True):
+                print(scDims)
+            print("The Exact values for 3D Ising even sector are")
+            with np.printoptions(precision=5, suppress=True):
+                print(scDEvenExt)
+        if sector[0] == "odd":
+            print("The scaling dimensions of odd operators are:")
+            with np.printoptions(precision=5, suppress=True):
+                print(scDims)
+            print("The Exact values for 3D Ising odd sector are")
+            with np.printoptions(precision=5, suppress=True):
+                print(scDOddExt)
+        print("\\--------------------/")
+        # save scaling dimensions
+        scDFile = tenDir + "/scDim-rg{:02d}-{:s}.pkl".format(rgn, sector[0])
+        with open(scDFile, "wb") as f:
+            pkl.dump([rgn, scDims, baseEig], f)
+
+
 def linRG2x(Astar, cgtens, scheme="hotrg3d", ver="base",
-            nscaleD=[10, 10], comm=None):
+            nscaleD=[10, 10], comm=None, sector=[None, None]):
     """scaling dimensions from linearized RG equation
     Currently only design for 3d HOTRG
 
@@ -318,14 +442,31 @@ def linRG2x(Astar, cgtens, scheme="hotrg3d", ver="base",
     ising3d = tnrg.TensorNetworkRG("ising3d")
     linearRGSet, dims_PsiA = hotrg3d.get_linearRG(Astar, cgtens,
                                                   comm=comm)
-    scDimsEven, baseEig = ising3d.linearRG2scaleD(
-        linearRGSet[0], dims_PsiA[0], nscaleD[0], baseEig=None
-    )
-    scDimsOdd = ising3d.linearRG2scaleD(
-        linearRGSet[1], dims_PsiA[1], nscaleD[1], baseEig=baseEig
-    )
-    scDims = [scDimsEven, scDimsOdd]
-    return scDims
+    if sector[0] is None:
+        # even and odd sector in series
+        scDimsEven, baseEig = ising3d.linearRG2scaleD(
+            linearRGSet[0], dims_PsiA[0], nscaleD[0], baseEig=None
+        )
+        scDimsOdd = ising3d.linearRG2scaleD(
+            linearRGSet[1], dims_PsiA[1], nscaleD[1], baseEig=baseEig
+        )
+        scDims = [scDimsEven, scDimsOdd]
+        return scDims
+    else:
+        # separately
+        if sector[0] == "even":
+            scDimsEven, baseEig = ising3d.linearRG2scaleD(
+                linearRGSet[0], dims_PsiA[0], nscaleD, baseEig=None
+            )
+            return scDimsEven, baseEig
+        elif sector[0] == "odd":
+            scDimsOdd = ising3d.linearRG2scaleD(
+                linearRGSet[1], dims_PsiA[1], nscaleD, baseEig=sector[1]
+            )
+            return scDimsOdd, sector[1]
+        else:
+            errMsg = "sector should be even or odd"
+            raise ValueError(errMsg)
 
 
 # generate directory name for saving
