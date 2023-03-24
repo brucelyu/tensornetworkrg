@@ -548,8 +548,10 @@ def plotscaleD(rgsteps, scDList,
                colors="black", linestyles="solid", alpha=0.2)
     # set axis ranges
     plt.xticks(rgsteps)
+    if len(rgsteps) == 1:
+        plt.xlim([rgsteps[0] - 1, rgsteps[0] + 1])
     plt.ylim([-0.1, 3.4])
-    plt.ylabel("Scaling dimensions")
+    plt.ylabel("Even sector")
     # put explanations on the figure
     plt.text(rgsteps[0] + 0.4, 1.41 - 0.25, r"$\epsilon$", size=14)
     plt.text(rgsteps[0] + 0.4, 3 - 0.25, r"$T_{ij}$", size=14)
@@ -572,12 +574,14 @@ def plotscaleD(rgsteps, scDList,
                colors="blue", linestyles="solid", alpha=0.2)
     plt.xticks(rgsteps)
     plt.ylim([-0.1, 3.0])
-    plt.ylabel("Scaling dimensions")
+    plt.ylabel("Odd sector")
     plt.xlabel("RG step")
     plt.text(rgsteps[0] + 0.4, 0.518 - 0.2, r"$\sigma$", size=14)
     plt.text(rgsteps[0] + 0.35, 1.518 - 0.2, r"$\partial_i\sigma$",
              size=14, color="blue")
     plt.text(rgsteps[0] + 0.3, 2.518 - 0.2,
              r"$\partial_i \partial_j \sigma$", size=14, color="blue")
+    if len(rgsteps) == 1:
+        plt.xlim([rgsteps[0] - 1, rgsteps[0] + 1])
     plt.savefig(saveDir + "/scDim.png",
                 bbox_inches='tight', dpi=300)
