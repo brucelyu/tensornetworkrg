@@ -193,4 +193,53 @@ def contr2Psy(octuAs, sy):
     )
     return Psy_dagger.conj()
 
+
 # II.2 Helper function for constructing γsy
+def absbs2AA_left(dbA, sx, sz):
+    """absorb sx*, sz* to the left legs of double-A tensor
+
+    Args:
+        dbA (TensorCommon): 6-leg tensor
+              zd  z
+              |  |
+         yd-- dbA --y
+             /  /
+           xd  x
+
+    Returns: dbAs
+
+    """
+    dbAs = ncon([dbA, sx.conj(), sz.conj()],
+                [[-1, 1, -3, -4, -5, 2],
+                 [1, -2], [2, -6]])
+    return dbAs
+
+
+def absbs2octuA_left(octuA, sy):
+    """absorb three copies of sy to the left of octupole-A tensor
+
+    Args:
+        octuA (TensorCommon): 8-leg tensor
+
+    Returns: octuAs
+
+    """
+    octuAs = ncon([octuA, sy, sy, sy.conj()],
+                  [[-1, -2, -3, 1, -5, 2, -7, 3],
+                   [1, -4], [2, -6], [3, -8]])
+    return octuAs
+
+
+def contr2Gammasy(octuAss, sy):
+    """construct the environment γsy
+    """
+    octuAsssy = ncon([octuAss, sy, sy.conj()],
+                     [[1, 2, -3, -4, -5, -6, -7, -8],
+                      [1, -1], [2, -2]])
+    # Six legs are contracted; the cost is 2 + 6 + 2, so O(χ^{10})
+    Gammasy_dagger = ncon(
+        [octuAss, octuAsssy.conj()],
+        [[-3, -1, 4, 1, 5, 2, 6, 3],
+         [-4, -2, 4, 1, 5, 2, 6, 3]]
+    )
+    return Gammasy_dagger.conj()
