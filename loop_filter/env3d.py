@@ -134,7 +134,7 @@ def cubePsiPsi(A):
 # where some chosen sy's vary,
 # while all other sx, sy, and sz's are treated as constant
 
-# II.1 Helper function for constructing Psy
+# II.1 Helper function for constructing Psy (Prototype)
 def absbs2AA(dbA, sx, sz):
     """absorb sx, sz matrices to double-A tensor
 
@@ -186,6 +186,7 @@ def contr2Psy(octuAs, sy):
     octuAssy = ncon([octuAs, sy],
                     [[1, -2, -3, -4, -5, -6, -7, -8],
                      [1, -1]])
+    # Seven legs are contracted; the cost is 1 + 7 + 1, so O(χ^9)
     Psy_dagger = ncon(
         [octuAs, octuAssy.conj()],
         [[-1, 1, 5, 2, 6, 3, 7, 4],
@@ -194,7 +195,7 @@ def contr2Psy(octuAs, sy):
     return Psy_dagger.conj()
 
 
-# II.2 Helper function for constructing γsy
+# II.2 Helper function for constructing γsy (Prototype)
 def absbs2AA_left(dbA, sx, sz):
     """absorb sx*, sz* to the left legs of double-A tensor
 
@@ -243,3 +244,66 @@ def contr2Gammasy(octuAss, sy):
          [-4, -2, 4, 1, 5, 2, 6, 3]]
     )
     return Gammasy_dagger.conj()
+
+
+# II.3 Combine the previous two sets of helper functions
+# to construct general Ps and γs
+def cubePermute(A, sx, sy, sz,
+                direction="y"):
+    # For constructing sz, sx environments
+    # from the prototypical sy one
+    if direction == "y":
+        # do nothing for prototypical case
+        return A, sx, sy, sz
+    # 1) Permute legs of A
+    # 2) Permuate sx, sy, sz
+    elif direction == "z":
+        # (xyz) --> (yzx)
+        Ap = A.transpose([2, 3, 4, 5, 0, 1])
+        sxp = sy * 1.0
+        syp = sz * 1.0
+        szp = sx * 1.0
+    elif direction == "x":
+        # (xyz) --> (zxy)
+        Ap = A.transpose([4, 5, 0, 1, 2, 3])
+        sxp = sz * 1.0
+        syp = sx * 1.0
+        szp = sy * 1.0
+    else:
+        errMsg = "direction should be x, y or z"
+        raise ValueError(errMsg)
+    return Ap, sxp, syp, szp
+
+
+def cubePs(A, sx, sy, sz,
+           direction="y"):
+    (
+        Ap, sxp, syp, szp
+    ) = cubePermute(
+         A, sx, sy, sz,
+         direction
+    )
+    # construct Ps in smaller steps
+    # Psy is the protypical case
+    # Step #1: contract two copies of A
+    # Cost: O(χ^9)
+    dbA = contr2A(Ap)
+    # Step #2: absorb sx and sz to dbA
+    dbAs = absbs2AA(dbA, sxp, szp)
+    # Step #3: contract two copies of dbAs
+    # Cost: O(χ^{10})
+    quadrA = contrx(dbAs)
+    # Step #4: contract two copies of quadrA
+    # Cost: O(χ^{12}) <--- This is the bottleneck of the efficiency
+    octuA = contrz(quadrA)
+
+    # Step #5: absorb sy
+    octuAs = absbs2octuA(octuA, syp)
+    # Step #6: contract octuAs and sy to get Psy
+    # Cost: O(χ^9)
+    Psy = contr2Psy(octuAs, syp)
+    return Psy
+
+# TODO
+def cubeGammas():
+    return 0
