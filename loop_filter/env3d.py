@@ -277,9 +277,14 @@ def cubePermute(A, sx, sy, sz,
 
 def cubePs(A, sx, sy, sz,
            direction="y"):
-    (
-        Ap, sxp, syp, szp
-    ) = cubePermute(
+    """
+    Construct `Ps` environment in smaller steps.
+    The bottleneck for the computational efficiency is
+    the step `contrz` with cost O(χ^{12})
+    """
+    # rotate A and permute sx, sy, sz
+    # according to the direction
+    (Ap, sxp, syp, szp) = cubePermute(
          A, sx, sy, sz,
          direction
     )
@@ -301,9 +306,47 @@ def cubePs(A, sx, sy, sz,
     octuAs = absbs2octuA(octuA, syp)
     # Step #6: contract octuAs and sy to get Psy
     # Cost: O(χ^9)
-    Psy = contr2Psy(octuAs, syp)
-    return Psy
+    Ps = contr2Psy(octuAs, syp)
+    return Ps
 
-# TODO
-def cubeGammas():
-    return 0
+
+def cubeGammas(A, sx, sy, sz,
+               direction="y"):
+    """
+    Construct `γ` environment in smaller steps.
+    The bottleneck for the computational efficiency is
+    the step `contrz` with cost O(χ^{12})
+    """
+    # rotate A and permute sx, sy, sz
+    # according to the direction
+    (Ap, sxp, syp, szp) = cubePermute(
+         A, sx, sy, sz,
+         direction
+    )
+    # construct γs in smaller steps
+    # γs is the protypical case
+    # Step #1: contract two copies of A
+    # (same as Ps)
+    # Cost: O(χ^9)
+    dbA = contr2A(Ap)
+    # Step #2.i: absorb sx and sz on the right of dbA
+    # (same as Ps)
+    dbAs = absbs2AA(dbA, sxp, szp)
+    # Step #2.ii: absorb sx and sz on the left of dbAs
+    # (*new for γs)
+    dbAss = absbs2AA_left(dbAs, sxp, szp)
+    # Step #3 and #4: get quadra- and octu-A
+    # (same as Ps)
+    quadrA = contrx(dbAss)
+
+    # Cost: O(χ^{12}) <--- This is the bottleneck of the efficiency
+    octuA = contrz(quadrA)
+    # Step #5.i: absorb sy on the right of octuA
+    # (same as Ps)
+    octuAs = absbs2octuA(octuA, syp)
+    # Step #5.ii: absorb sy on the left of uctA
+    # (*new for γs)
+    octuAss = absbs2octuA_left(octuAs, syp)
+    # Step #6: contract octuAss and sy to get γsy
+    Gammas = contr2Gammasy(octuAss, syp)
+    return Gammas
