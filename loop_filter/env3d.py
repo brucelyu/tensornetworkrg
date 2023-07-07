@@ -238,12 +238,12 @@ def contr2Gammasy(octuAss, sy):
                      [[1, 2, -3, -4, -5, -6, -7, -8],
                       [1, -1], [2, -2]])
     # Six legs are contracted; the cost is 2 + 6 + 2, so O(χ^{10})
-    Gammasy_dagger = ncon(
+    Gammasy = ncon(
         [octuAss, octuAsssy.conj()],
         [[-3, -1, 4, 1, 5, 2, 6, 3],
          [-4, -2, 4, 1, 5, 2, 6, 3]]
     )
-    return Gammasy_dagger.conj()
+    return Gammasy
 
 
 # II.3 Combine the previous two sets of helper functions
@@ -350,3 +350,26 @@ def cubeGammas(A, sx, sy, sz,
     # Step #6: contract octuAss and sy to get γsy
     Gammas = contr2Gammasy(octuAss, syp)
     return Gammas
+
+
+# For initialization of s matrices
+def cubeGamma(A, direction="y"):
+    """
+    Almost the same as `cubeGammas`, except
+    all s matrices are identity
+    """
+    # rotate A and permute sx, sy, sz
+    # according to the direction
+    (Ap, sxp, syp, szp) = cubePermute(
+         A, 1, 1, 1,
+         direction
+    )
+    dbA = contr2A(Ap)
+    quadrA = contrx(dbA)
+    octuA = contrz(quadrA)
+    Gammasy = ncon(
+        [octuA, octuA.conj()],
+        [[-3, -1, 4, 1, 5, 2, 6, 3],
+         [-4, -2, 4, 1, 5, 2, 6, 3]]
+    )
+    return Gammasy
