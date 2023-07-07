@@ -107,28 +107,28 @@ def edlten(cornerChi=2, singleYSide=True):
 
 # II.2 Corner-triple-line (CTL) structure:
 # 8 copies of 3-leg edge tensors.
-def ctlten(cornerChi=2, isZ2=False):
+def ctlten(cornerChi=2, singleYSide=True):
     """
     I'm not very sure about the Z2 version now...
     See the notes for the tensor network diagrams...
     """
     # create 3D corner matrix
-    if not isZ2:
-        cmat = Tensor.random([cornerChi]*3)
-    else:
-        n = [cornerChi // 2, cornerChi - cornerChi // 2]
-        shape = [n] * 3
-        qhape = [[0, 1]] * 3
-        dirs = [1, 1, 1]
-        cmat = TensorZ2.random(
-             shape=shape, qhape=qhape, dirs=dirs
-         )
+    cmat = Tensor.random([cornerChi]*3)
+    EYE111 = Tensor.ones([1]*3)
     # construct the CTL structure
     # A "direct product" of 8 copies of 3-leg coner matrix
+    if singleYSide:
+        tenList = [
+            cmat, EYE111.conj(), EYE111, cmat.conj(),
+            cmat.conj(), EYE111, EYE111.conj(), cmat
+        ]
+    else:
+        tenList = [
+            cmat, cmat.conj(), cmat, cmat.conj(),
+            cmat.conj(), cmat, cmat.conj(), cmat
+        ]
     ctl = ncon(
-        [cmat, cmat.conj(), cmat, cmat.conj(),
-         cmat.conj(), cmat, cmat.conj(), cmat
-         ],
+        tenList,
         [[-1, -9, -17], [-2, -13, -20],
          [-3, -14, -24], [-4, -10, -21],
          #
