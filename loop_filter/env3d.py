@@ -352,7 +352,7 @@ def cubeGammas(A, sx, sy, sz,
     return Gammas
 
 
-# For initialization of s matrices
+# III. For initialization of s matrices
 def cubeGamma(A, direction="y"):
     """
     Almost the same as `cubeGammas`, except
@@ -373,3 +373,21 @@ def cubeGamma(A, direction="y"):
          [-4, -2, 4, 1, 5, 2, 6, 3]]
     )
     return Gammasy
+
+
+# IV. Fidelity
+def cubeFidelity(s, Ps, Gammas, PsiPsi=1):
+    """
+    Fidelity of FET approximation:
+    0 <= f <= 1
+    The process is exact if fidelity f = 1
+    """
+    # <ψ|φ>
+    PsiPhi = ncon([Ps.conj(), s], [[1, 2], [1, 2]])
+    # <φ|φ>
+    PhiPhi = ncon([Gammas, s.conj(), s],
+                  [[1, 2, 3, 4], [1, 2], [3, 4]])
+    # fidelity = |<ψ|φ>|^2 / (<φ|φ> <ψ|ψ>)
+    f = PsiPhi * PsiPhi.conj() / (PhiPhi * PsiPsi)
+    f = f.norm()
+    return f, 1 - f, PhiPhi
