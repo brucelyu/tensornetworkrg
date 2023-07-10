@@ -189,8 +189,8 @@ def contr2Psy(octuAs, sy):
     # Seven legs are contracted; the cost is 1 + 7 + 1, so O(χ^9)
     Psy_dagger = ncon(
         [octuAs, octuAssy.conj()],
-        [[-1, 1, 5, 2, 6, 3, 7, 4],
-         [-2, 1, 5, 2, 6, 3, 7, 4]]
+        [[-1, 1, 2, 3, 4, 5, 6, 7],
+         [-2, 1, 2, 3, 4, 5, 6, 7]]
     )
     return Psy_dagger.conj()
 
@@ -240,8 +240,8 @@ def contr2Gammasy(octuAss, sy):
     # Six legs are contracted; the cost is 2 + 6 + 2, so O(χ^{10})
     Gammasy = ncon(
         [octuAss, octuAsssy.conj()],
-        [[-3, -1, 4, 1, 5, 2, 6, 3],
-         [-4, -2, 4, 1, 5, 2, 6, 3]]
+        [[-3, -1, 1, 2, 3, 4, 5, 6],
+         [-4, -2, 1, 2, 3, 4, 5, 6]]
     )
     return Gammasy
 
@@ -369,8 +369,8 @@ def cubeGamma(A, direction="y"):
     octuA = contrz(quadrA)
     Gammasy = ncon(
         [octuA, octuA.conj()],
-        [[-3, -1, 4, 1, 5, 2, 6, 3],
-         [-4, -2, 4, 1, 5, 2, 6, 3]]
+        [[-3, -1, 1, 2, 3, 4, 5, 6],
+         [-4, -2, 1, 2, 3, 4, 5, 6]]
     )
     return Gammasy
 
