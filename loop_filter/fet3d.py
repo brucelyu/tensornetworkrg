@@ -34,3 +34,21 @@ def findLr(Gamma, epsilon=1e-10,
                             soft=soft, chiCut=chiCut)
     Lr = ncon([Gamma_pinv, Gamma], [[-1, -2, 1, 2], [1, 2, 3, 3]])
     return Lr
+
+
+def init_s_gilt(Gamma, chis, epsilon_init,
+                init_soft=False):
+    """
+    Initialize s matrix using `findLr`
+    """
+    # determine cut bond dimension for pseudo-inverse of Gamma
+    if chis is None:
+        chiCut = None
+    else:
+        chiCut = chis**2
+    # use baby FET to find low-rank matrix
+    Lr = findLr(Gamma, epsilon=epsilon_init,
+                soft=init_soft, chiCut=chiCut)
+    # split low-rank matrix to find s
+    s = Lr.split([0], [1], chis=chis)[0]
+    return s, Lr
