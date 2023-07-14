@@ -391,3 +391,13 @@ def cubeFidelity(s, Ps, Gammas, PsiPsi=1):
     f = PsiPhi * PsiPhi.conj() / (PhiPhi * PsiPsi)
     f = f.norm()
     return f, 1 - f, PhiPhi
+
+
+def initFidelity(Lr, Gamma):
+    """
+    Fidlity for initial low-rank matrix Lr
+    """
+    PsiPsi = ncon([Gamma], [[1, 1, 2, 2]])
+    P = ncon([Gamma], [[-1, -2, 1, 1]])
+    f, err, PhiPhi = cubeFidelity(Lr, P, Gamma, PsiPsi)
+    return f, err
