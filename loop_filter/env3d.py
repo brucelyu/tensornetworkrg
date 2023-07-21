@@ -275,6 +275,7 @@ def cubePermute(A, sx, sy, sz,
     return Ap, sxp, syp, szp
 
 
+# Below are two old implementations before 20 July \=\=\=\
 def cubePs(A, sx, sy, sz,
            direction="y"):
     """
@@ -350,7 +351,56 @@ def cubeGammas(A, sx, sy, sz,
     # Step #6: contract octuAss and sy to get γsy
     Gammas = contr2Gammasy(octuAss, syp)
     return Gammas
+# _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 
+
+# Break the construction of Ps and γs into two steps
+# 1. First contraction has cost O(χ^{12})
+# and involves with absorbing two neigboring s matrices
+# 2. Second contraction has cost O(χ^{10})
+# and involves with absorbing the s matrix to be optimized
+def firstContr(Ap, sxp, szp):
+    """
+    Input tensors are all assumed to be
+    rotated into the prototypical position
+    after applying the `cubePermute` function
+    """
+    # Step #1: contract two copies of A
+    # Cost: O(χ^9)
+    dbA = contr2A(Ap)
+    # Step #2.i: absorb sx and sz to dbA
+    dbAs = absbs2AA(dbA, sxp, szp)
+    # Step #2.ii: absorb sx and sz on the left of dbAs
+    # (*new for γs)
+    dbAss = absbs2AA_left(dbAs, sxp, szp)
+    # Step #3: contract two copies of dbAs
+    # Cost: O(χ^{10})
+    # 3.i For Ps
+    quadrAs = contrx(dbAs)
+    # 3.ii For γs
+    quadrAss = contrx(dbAss)
+    # Step #4: contract two copies of quadrA
+    # Cost: O(χ^{12}) <--- This is the bottleneck of the efficiency
+    # 4.i For Ps
+    octu4P = contrz(quadrAs)
+    # 4.ii For γs
+    octu4Gamma = contrz(quadrAss)
+    return octu4P, octu4Gamma
+
+
+def secondContr(octu4P, octu4Gamma, syp):
+    # Step #5: absorb sy
+    # 5.i For Ps
+    octu4Ps = absbs2octuA(octu4P, syp)
+    # 5.ii For γs
+    octu4Gammas = absbs2octuA(octu4Gamma, syp)
+    octu4Gammass = absbs2octuA_left(octu4Gammas, syp)
+    # Step #6: contract octuAs and sy to get Psy
+    # 6.i For Ps, Cost is O(χ^9)
+    Ps = contr2Psy(octu4Ps, syp)
+    # 6.ii For γs, Cost is O(χ^10)
+    Gammas = contr2Gammasy(octu4Gammass, syp)
+    return Ps, Gammas
 
 # III. For initialization of s matrices
 def cubeGamma(A, direction="y"):
@@ -375,29 +425,3 @@ def cubeGamma(A, direction="y"):
     return Gammasy
 
 
-# IV. Fidelity
-def cubeFidelity(s, Ps, Gammas, PsiPsi=1):
-    """
-    Fidelity of FET approximation:
-    0 <= f <= 1
-    The process is exact if fidelity f = 1
-    """
-    # <ψ|φ>
-    PsiPhi = ncon([Ps.conj(), s], [[1, 2], [1, 2]])
-    # <φ|φ>
-    PhiPhi = ncon([Gammas, s.conj(), s],
-                  [[1, 2, 3, 4], [1, 2], [3, 4]])
-    # fidelity = |<ψ|φ>|^2 / (<φ|φ> <ψ|ψ>)
-    f = PsiPhi * PsiPhi.conj() / (PhiPhi * PsiPsi)
-    f = f.norm()
-    return f, 1 - f, PhiPhi
-
-
-def initFidelity(Lr, Gamma):
-    """
-    Fidlity for initial low-rank matrix Lr
-    """
-    PsiPsi = ncon([Gamma], [[1, 1, 2, 2]])
-    P = ncon([Gamma], [[-1, -2, 1, 1]])
-    f, err, PhiPhi = cubeFidelity(Lr, P, Gamma, PsiPsi)
-    return f, err
