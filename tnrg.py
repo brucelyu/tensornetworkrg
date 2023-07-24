@@ -14,6 +14,7 @@ from ncon import ncon
 from .initial_tensor import initial_tensor
 from .coarse_grain_2d import trg_evenbly, tnr_evenbly, hotrg
 from .coarse_grain_3d import hotrg as hotrg3d
+from .coarse_grain_3d import block_tensor as bkten3d
 from .loop_filter import cleanLoop, toymodels
 from . import u1ten
 
@@ -785,6 +786,91 @@ class TensorNetworkRG3D(TensorNetworkRG):
         # no loop-filtering error
         lrerr = 0
         return lrerr, SPerrList
+
+    def block_hotrg(
+        self,
+        pars={"chi": 4, "chiM": 4, "chiI": 4, "chiII": 4,
+              "cg_eps": 1e-16, "display": True},
+        signFix=False,
+        comm=None
+    ):
+        """
+        HOTRG-like implementation of 3D block-tensor RG.
+        It interpolates between the full block-tensor RG
+        and the usual HOTRG by adjust bond dimensions:
+        - Usual HOTRG:
+            χ = χM = χI = χII
+        - Full block-tensor:
+            χM = χI = χ^2
+            χII = χ^4
+        Besides, the reflection symmetry is explicitly imposed
+        in such a way to suit cube-entanglement filtering
+        """
+        if self.iter_n == 0:
+            self.boundary = "parallel"
+        # 0. read parameters
+        chi = pars["chi"]
+        chiM = pars["chiM"]
+        chiI = pars["chiI"]
+        chiII = pars["chiII"]
+        cg_eps = pars["cg_eps"]
+        display = pars["display"]
+        # I. coarse graining
+        Aold = self.get_tensor()
+        Aout = Aold * 1.0
+        if display:
+            print("--------------------")
+            print("--------------------")
+        # I.1 z direction
+        zpjs, zerrs, zds = bkten3d.zfindp(Aout, chiM, chiI,
+                                          cg_eps=cg_eps)
+        pmx, pix, pmy, piy = zpjs
+        Aout = bkten3d.zblock(
+            Aout, pmx.conj(), pmy.conj(), pix, piy
+        )
+        # I.2 y direction
+        ypjs, yerrs, yds = bkten3d.yfindp(Aout, chi, chiM, chiII,
+                                          cg_eps=cg_eps)
+        pmz, pox, piix = ypjs
+        Aout = bkten3d.yblock(
+            Aout, pmz.conj(), pox.conj(), pmz, piix
+        )
+        # I.3 x direction
+        xpjs, xerrs, xds = bkten3d.xfindp(Aout, chi,
+                                          cg_eps=cg_eps)
+        poy, poz = xpjs
+        Aout = bkten3d.xblock(
+            Aout, poy.conj(), poz.conj(), poy, poz
+        )
+        if display:
+            print("Brief summary of block-tensor RG errors...")
+            print("I. Outmost errors: (χ = {:.d})".format(chi),
+                  "-- x={:.2e}, y={:.2e}, z={:.2e} --".format(
+                      yerrs[1], xerrs[0], xerrs[1]
+                  ))
+            print("II. Intermediate errors: (χm = {:.d})".format(chiM),
+                  "-- x={:.2e}, y={:.2e}, z={:.2e} --".format(
+                      zerrs[0], zerrs[2], yerrs[0]
+                  ))
+            print("III. Inner-cube errors:",
+                  "(χi = {:.d}, χii = {:.d})".format(chiI, chiII),
+                  "-- xin={:.2e}, yin={:.2e}, xinin={:.2e} --".format(
+                      zerrs[1], zerrs[3], yerrs[2]
+                  ))
+
+        # update current outmost isometries (for gauge usage)
+        self.isometry_applied = [pox, poy, poz]
+        # update the current tensor
+        self.current_tensor = Aout * 1.0
+        # pull out the tensor norm and save
+        ten_mag = self.pullout_magnitude()
+        self.save_tensor_magnitude(ten_mag)
+
+        # return approximation errors
+        # no loop-filtering error
+        lrerr = 0
+        rgerr = [zerrs, yerrs, xerrs]
+        return lrerr, rgerr
 
     def rgmap(self, tnrg_pars,
               scheme="hotrg3d", ver="base",
