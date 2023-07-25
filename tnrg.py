@@ -844,17 +844,17 @@ class TensorNetworkRG3D(TensorNetworkRG):
         )
         if display:
             print("Brief summary of block-tensor RG errors...")
-            print("I. Outmost errors: (χ = {:.d})".format(chi),
-                  "-- x={:.2e}, y={:.2e}, z={:.2e} --".format(
+            print("I. Outmost errors: (χ = {:d})".format(chi))
+            print("x = {:.2e}, y = {:.2e}, z = {:.2e}".format(
                       yerrs[1], xerrs[0], xerrs[1]
                   ))
-            print("II. Intermediate errors: (χm = {:.d})".format(chiM),
-                  "-- x={:.2e}, y={:.2e}, z={:.2e} --".format(
+            print("II. Intermediate errors: (χm = {:d})".format(chiM))
+            print("x = {:.2e}, y = {:.2e}, z = {:.2e}".format(
                       zerrs[0], zerrs[2], yerrs[0]
                   ))
             print("III. Inner-cube errors:",
-                  "(χi = {:.d}, χii = {:.d})".format(chiI, chiII),
-                  "-- xin={:.2e}, yin={:.2e}, xinin={:.2e} --".format(
+                  "(χi = {:d}, χii = {:d})".format(chiI, chiII))
+            print("xin = {:.2e}, yin = {:.2e}, xinin = {:.2e}".format(
                       zerrs[1], zerrs[3], yerrs[2]
                   ))
 
