@@ -19,6 +19,7 @@ from .hotrg import zCollapseXproj
 from ncon import ncon
 
 
+# I. For determing isometric tensors
 def zfind1p(A, chi, which="pmx", cg_eps=1e-8):
     # 0. For leg permutation
     # 0.1 For leg permutation in z direction
@@ -85,7 +86,7 @@ def zfindp(A, chiM, chiI, cg_eps=1e-8):
 def yfindp(Az, chi, chiM, chiII, cg_eps=1e-8):
     """
     Projectors for y-direction coarse graining
-    after z-direction one.
+    after z-direction block-tensor RG.
     """
     # rotation xyz --> zxy
     Ar = Az.transpose([4, 5, 0, 1, 2, 3])
@@ -109,6 +110,32 @@ def yfindp(Az, chi, chiM, chiII, cg_eps=1e-8):
     return yprojs, yerrs, yds
 
 
+def xfindp(Azy, chi, cg_eps=1e-8):
+    """
+    Projectors for x-direction coarse graining
+    after z- and y-direction block-tensor RG.
+    """
+    # rotation xyz --> yzx
+    Ar = Azy.transpose([2, 3, 4, 5, 0, 1])
+    # I. poy
+    (
+        poy, erroy, doy
+    ) = zfind1p(Ar, chi, which="pmx", cg_eps=cg_eps)
+    # II. poz
+    (
+        poz, erroz, doz
+    ) = zfind1p(Ar, chi, which="pmy", cg_eps=cg_eps)
+    # group projectors
+    xprojs = [poy, poz]
+    xerrs = [erroy, erroz]
+    xds = [doy, doz]
+    return xprojs, xerrs, xds
+
+
+# II. For block-tensor transformation along a single direction
+
+# All 1-direction tensor contraction is calling this as prototype
+# including `yblock` and `xblock`
 def zblock(A, pxc, pyc, px, py, comm=None):
     # contraction for coarse graining process
     # This version has computation cost O(chi^11) and
@@ -121,18 +148,46 @@ def zblock(A, pxc, pyc, px, py, comm=None):
     return Aout
 
 
+# This calls `zblock`
+def yblock(Az, pzc, pxc, pz, px, comm=None):
+    # rotate to the prototpye position
+    # rotation xyz --> zxy
+    Ar = Az.transpose([4, 5, 0, 1, 2, 3])
+    # call `zblock` to contract
+    Azy = zblock(Ar, pzc, pxc, pz, px, comm=comm)
+    # rotate back to absolute position
+    Azy = Azy.transpose([2, 3, 4, 5, 0, 1])
+    return Azy
+
+
+# This calls `zblock`
+def xblock(Azy, pyc, pzc, py, pz, comm=None):
+    # rotate to the prototpye position
+    # rotation xyz --> yzx
+    Ar = Azy.transpose([2, 3, 4, 5, 0, 1])
+    # call `zblock` to contract
+    Ac = zblock(Ar, pyc, pzc, py, pz, comm=comm)
+    # rotate back
+    Ac = Ac.transpose([4, 5, 0, 1, 2, 3])
+    return Ac
+
+
 # Useful for algorithm development
-def moErrs(A, chi, chiM, chiI, chiII):
+def moErrs(A, chi, chiM, chiI, chiII,
+           firsterr=True):
     """
     Various RG errors if we coarse grain A
     """
     # determine z projectors
     zpjs, zerr = zfindp(A, chiM, chiI)[:2]
-    pmx, pix, pmy, piy = zpjs
-    # contract z direction
-    Az = zblock(A, pmx.conj(), pmy.conj(), pix, piy)
-    # determine y projectors
-    ypjs, yerr = yfindp(Az, chi, chiM, chiII)[:2]
-    errmx, errix, errmy, erriy = zerr
-    errmz, errox, erriix = yerr
-    return errmx, errmy, errmz, errox, errix, erriy, erriix
+    if firsterr:
+        return zerr
+    else:
+        pmx, pix, pmy, piy = zpjs
+        # contract z direction
+        Az = zblock(A, pmx.conj(), pmy.conj(), pix, piy)
+        # determine y projectors
+        ypjs, yerr = yfindp(Az, chi, chiM, chiII)[:2]
+        errmx, errix, errmy, erriy = zerr
+        errmz, errox, erriix = yerr
+        return errmx, errmy, errmz, errox, errix, erriy, erriix
