@@ -282,8 +282,9 @@ def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
             eey = tnrg3dCase.entangle(leg="y")[0]
             eez = tnrg3dCase.entangle(leg="z")[0]
             eexyz = tnrg3dCase.entangle(leg="xyz")[0]
-        # maximal RG replacement errors of all 3*2=6 squeezers
-        errMax = np.max(SPerrs)
+        # maximal RG replacement errors of all squeezers
+        # `SPerrs` is 2-layer nested list, so we first flatten it
+        errMax = np.max([item for sublist in SPerrs for item in sublist])
         # cur_g = tnrg3dCase.eval_free_energy()
         # record rg flows
         XFlow.append(curX)
