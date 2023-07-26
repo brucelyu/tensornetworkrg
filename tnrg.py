@@ -891,6 +891,13 @@ class TensorNetworkRG3D(TensorNetworkRG):
                  ) = self.hotrg(tnrg_pars,
                                 signFix=gaugeFix,
                                 comm=comm)
+        if scheme == "blockHOTRG":
+            if ver == "base":
+                (lferrs,
+                 SPerrs
+                 ) = self.block_hotrg(tnrg_pars,
+                                      signFix=gaugeFix,
+                                      comm=comm)
         return lferrs, SPerrs
 
     def eval_free_energy(self, initial_spin=1, b=2):
