@@ -169,9 +169,18 @@ def benm3DIsing(T=5.0, h=0, scheme="hotrg3d",
         print("TNRG epsilon: --{:.2e}--".format(dtol))
         print("TRNG iteration step: --{:d}--".format(rg_n))
         print("Impose Z2 symmetry? --{}--".format(isZ2))
+        print("------")
+        # print additional parameters for HOTRG-like block tensor RG
+        if scheme == "blockHOTRG":
+            print("    ",
+                  "HOTRG-like block-tensor RG is applied...")
+            print("    ", "chiM: --{:d}--".format(pars["chiM"]))
+            print("    ", "chiI: --{:d}--".format(pars["chiI"]))
+            print("    ", "chiII: --{:d}--".format(pars["chiII"]))
+        print("------")
         if comm is not None:
             print("Parallel computation in HOTRG contraction.")
-        print("------")
+        print("_/_/_/_/_/_/_/_/_/")
     # generate degenerate index X flow
     (
         XFlow, errMaxFlow, eeFlow,
