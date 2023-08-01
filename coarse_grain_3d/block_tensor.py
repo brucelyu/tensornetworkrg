@@ -17,6 +17,7 @@ What's more, the reflection symmetry is exactly imposed here.
 """
 from .hotrg import zCollapseXproj
 from ncon import ncon
+import numpy as np
 
 
 # I. For determing isometric tensors
@@ -230,6 +231,9 @@ def blockrg(A, chi, chiM, chiI, chiII,
         print("xin = {:.2e}, yin = {:.2e}, xinin = {:.2e}".format(
                   zerrs[1], zerrs[3], yerrs[2]
               ))
+        print("x-direction RG spectrum is")
+        xarr = -np.sort(-yds[1].to_ndarray())
+        print(xarr/xarr[0])
     return A, pox, poy, poz, xerrs, yerrs, zerrs
 
 
