@@ -47,10 +47,51 @@ def init_s_gilt(Gamma, chis, chienv, epsilon_init,
     Lr = findLr(Gamma, epsilon=epsilon_init,
                 soft=init_soft, chiCut=chienv)
     # split and truncate Lr to find s
-    s = Lr.split([0], [1], chis=chis)[0]
+    s = Lr.split([0], [1], chis=[k+1 for k in range(chis)],
+                 eps=epsilon_init)[0]
     # make the direction of s as [-1, 1]
     s = s.flip_dir(1)
     return s, Lr
+
+
+def init_alls(A, chis, chienv, epsilon):
+    """Initialization of s matrices in 3 directions
+
+    Args:
+        A (TensorCommon): 6-leg tensor
+            It is the tensor located at (+++) corner
+            of the block-tensor RG with shape
+            A[x, xp, y, yp, z, zp]
+        chis (int): squeezed bond dimension of s matrices
+            such that s is a χ-by-χs matrix.
+            It is the bond dimension for
+            the truncated SVD of low-rank Lr matrix.
+        chienv (int): for pseudo-inverse of leg environment
+            To avoid the trivial solution of Lr matrix,
+            we should truncate the singular values
+            when taking the pseudo-inverse of leg environment
+        epsilon (float): for psudo-inverse of leg environment
+            if further truncation to χ < chienv has
+            an error < epsilon, then we truncate to
+            the smallest possible χ.
+
+    Returns: sx, sy, sz
+        s matrices in 3 directions
+
+    """
+    # Construct environments for initialization of s matrices
+    # all have cost O(χ^12)
+    Gammay = env3d.cubeGamma(A, direction="y")
+    Gammaz = env3d.cubeGamma(A, direction="z")
+    Gammax = env3d.cubeGamma(A, direction="x")
+    # find initial Lr and s
+    sy, Lry = init_s_gilt(Gammay, chis, chienv, epsilon,
+                          init_soft=False)
+    sz, Lrz = init_s_gilt(Gammaz, chis, chienv, epsilon,
+                          init_soft=False)
+    sx, Lrx = init_s_gilt(Gammax, chis, chienv, epsilon,
+                          init_soft=False)
+    return sx, sy, sz, Lrx, Lry, Lrz, Gammay
 
 
 # II. For optimization of s matrix
@@ -238,7 +279,7 @@ def initFidelity(Lr, Gamma):
     return f, err
 
 
-# Others
+# Combine all the above functions
 def absbs(A, sx, sy, sz):
     """
     Apply sx, sy, and sz to the main tensor A
