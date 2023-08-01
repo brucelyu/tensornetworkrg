@@ -177,6 +177,19 @@ def benm3DIsing(T=5.0, h=0, scheme="hotrg3d",
             print("    ", "chiM: --{:d}--".format(pars["chiM"]))
             print("    ", "chiI: --{:d}--".format(pars["chiI"]))
             print("    ", "chiII: --{:d}--".format(pars["chiII"]))
+        elif scheme == "efrg":
+            print("    ",
+                  "Entanglement-free RG is applied...")
+            print("    ",
+                  "Parameters for entanglement-filtering proces:")
+            print("    ", "- chis: --{:d}--".format(pars["chis"]))
+            print("    ", "- chienv: --{:d}--".format(pars["chienv"]))
+            print("    ", "- epsilon: --{:.2e}--".format(pars["epsilon"]))
+            print("    ",
+                  "Parameters for block-tensor RG:")
+            print("    ", "- chiM: --{:d}--".format(pars["chiM"]))
+            print("    ", "- chiI: --{:d}--".format(pars["chiI"]))
+            print("    ", "- chiII: --{:d}--".format(pars["chiII"]))
         print("------")
         if comm is not None:
             print("Parallel computation in HOTRG contraction.")

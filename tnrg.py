@@ -15,7 +15,7 @@ from .initial_tensor import initial_tensor
 from .coarse_grain_2d import trg_evenbly, tnr_evenbly, hotrg
 from .coarse_grain_3d import hotrg as hotrg3d
 from .coarse_grain_3d import block_tensor as bkten3d
-from .loop_filter import cleanLoop, toymodels
+from .loop_filter import cleanLoop, toymodels, fet3d, env3d
 from . import u1ten
 
 
@@ -817,46 +817,13 @@ class TensorNetworkRG3D(TensorNetworkRG):
         display = pars["display"]
         # I. coarse graining
         Aold = self.get_tensor()
-        Aout = Aold * 1.0
-        if display:
-            print("--------------------")
-            print("--------------------")
-        # I.1 z direction
-        zpjs, zerrs, zds = bkten3d.zfindp(Aout, chiM, chiI,
-                                          cg_eps=cg_eps)
-        pmx, pix, pmy, piy = zpjs
-        Aout = bkten3d.zblock(
-            Aout, pmx.conj(), pmy.conj(), pix, piy
+        (
+            Aout, pox, poy, poz,
+            xerrs, yerrs, zerrs
+         ) = bkten3d.blockrg(
+            Aold, chi, chiM, chiI, chiII,
+            cg_eps, display
         )
-        # I.2 y direction
-        ypjs, yerrs, yds = bkten3d.yfindp(Aout, chi, chiM, chiII,
-                                          cg_eps=cg_eps)
-        pmz, pox, piix = ypjs
-        Aout = bkten3d.yblock(
-            Aout, pmz.conj(), pox.conj(), pmz, piix
-        )
-        # I.3 x direction
-        xpjs, xerrs, xds = bkten3d.xfindp(Aout, chi,
-                                          cg_eps=cg_eps)
-        poy, poz = xpjs
-        Aout = bkten3d.xblock(
-            Aout, poy.conj(), poz.conj(), poy, poz
-        )
-        if display:
-            print("Brief summary of block-tensor RG errors...")
-            print("I. Outmost errors: (χ = {:d})".format(chi))
-            print("x = {:.2e}, y = {:.2e}, z = {:.2e}".format(
-                      yerrs[1], xerrs[0], xerrs[1]
-                  ))
-            print("II. Intermediate errors: (χm = {:d})".format(chiM))
-            print("x = {:.2e}, y = {:.2e}, z = {:.2e}".format(
-                      zerrs[0], zerrs[2], yerrs[0]
-                  ))
-            print("III. Inner-cube errors:",
-                  "(χi = {:d}, χii = {:d})".format(chiI, chiII))
-            print("xin = {:.2e}, yin = {:.2e}, xinin = {:.2e}".format(
-                      zerrs[1], zerrs[3], yerrs[2]
-                  ))
 
         # update current outmost isometries (for gauge usage)
         self.isometry_applied = [pox, poy, poz]
@@ -869,6 +836,77 @@ class TensorNetworkRG3D(TensorNetworkRG):
         # return approximation errors
         # no loop-filtering error
         lrerr = 0
+        rgerr = [zerrs, yerrs, xerrs]
+        return lrerr, rgerr
+
+    def entfree_blockrg(
+        self,
+        pars={"chi": 6, "chiM": 6, "chiI": 15, "chiII": 36,
+              "cg_eps": 1e-16, "display": True,
+              "chis": 4, "chienv": 25, "epsilon": 1e-5},
+        signFix=False,
+        comm=None
+            ):
+        if self.iter_n == 0:
+            self.boundary = "parallel"
+        # 0.1 read parameters for block-tensor
+        chi = pars["chi"]
+        chiM = pars["chiM"]
+        chiI = pars["chiI"]
+        chiII = pars["chiII"]
+        cg_eps = pars["cg_eps"]
+        display = pars["display"]
+        # 0.2 read parameters for entanglement filtering
+        chis = pars["chis"]
+        chienv = pars["chienv"]
+        init_epsilon = pars["epsilon"]
+        # I. Entanglement filtering
+        # I.1 Find initial sx, sy, sz matrices
+        Aold = self.get_tensor()
+        Aout = Aold * 1.0
+        (
+            sx, sy, sz,
+            Lrx, Lry, Lrz, Gammay
+        ) = fet3d.init_alls(Aout, chis, chienv, init_epsilon)
+        if display:
+            print("Shape of initial sx is {}.".format(sx.shape))
+            print("Shape of initial sy is {}.".format(sy.shape))
+            print("Shape of initial sz is {}.".format(sz.shape))
+        # compute <ψ|ψ> for calculating fidelity
+        PsiPsi = ncon([Gammay], [[1, 1, 2, 2]])
+        # FET fidelity of inserting initial s matrices
+        Ps = env3d.cubePs(Aout, sx, sy, sz, direction="y")
+        Gammas = env3d.cubeGammas(Aout, sx, sy, sz, direction="y")
+        errFET0 = fet3d.cubeFidelity(sy, Ps, Gammas, PsiPsi)[1]
+        if display:
+            print("Initial FET error for insertion of",
+                  "s matrices is {:.2e}".format(errFET0))
+        # I.2 Optimization of sx, sy, sz matrices
+        # TODO
+
+        # II. coarse graining
+        # II.1 Absorb sx, sy, sz to (+++)-position tensor
+        Aout = fet3d.absbs(Aout, sx, sy, sz)
+        # II.2 Apply block-tensor transformation
+        (
+            Aout, pox, poy, poz,
+            xerrs, yerrs, zerrs
+         ) = bkten3d.blockrg(
+            Aout, chi, chiM, chiI, chiII,
+            cg_eps, display
+        )
+
+        # update current outmost isometries (for gauge usage)
+        self.isometry_applied = [pox, poy, poz]
+        # update the current tensor
+        self.current_tensor = Aout * 1.0
+        # pull out the tensor norm and save
+        ten_mag = self.pullout_magnitude()
+        self.save_tensor_magnitude(ten_mag)
+
+        # return approximation errors
+        # no loop-filtering error
+        lrerr = [errFET0]
         rgerr = [zerrs, yerrs, xerrs]
         return lrerr, rgerr
 
@@ -891,13 +929,20 @@ class TensorNetworkRG3D(TensorNetworkRG):
                  ) = self.hotrg(tnrg_pars,
                                 signFix=gaugeFix,
                                 comm=comm)
-        if scheme == "blockHOTRG":
+        elif scheme == "blockHOTRG":
             if ver == "base":
                 (lferrs,
                  SPerrs
                  ) = self.block_hotrg(tnrg_pars,
                                       signFix=gaugeFix,
                                       comm=comm)
+        elif scheme == "efrg":
+            if ver == "base":
+                (lferrs,
+                 SPerrs
+                 ) = self.entfree_blockrg(tnrg_pars,
+                                          signFix=gaugeFix,
+                                          comm=comm)
         return lferrs, SPerrs
 
     def eval_free_energy(self, initial_spin=1, b=2):
