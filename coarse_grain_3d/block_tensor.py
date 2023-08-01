@@ -172,6 +172,67 @@ def xblock(Azy, pyc, pzc, py, pz, comm=None):
     return Ac
 
 
+# III. Full block-tensor transformation
+def blockrg(A, chi, chiM, chiI, chiII,
+            cg_eps=1e-10, display=True):
+    """tensor coarse grain
+
+    Args:
+        A (TensorCommon): 6-leg tensor
+        chi (int): output bond dimension
+        chiM (int): intermediate bond dimension
+        chiI (int): first inner bond dimension
+        chiII (int): second inner bond dimension
+
+    Kwargs:
+        cg_eps (float):
+        display (boolean):
+
+    Returns: Aout, 6-leg coarser tensor
+
+    """
+    if display:
+        print("--------------------")
+        print("--------------------")
+    # I.1 z direction
+    zpjs, zerrs, zds = zfindp(A, chiM, chiI,
+                              cg_eps=cg_eps)
+    pmx, pix, pmy, piy = zpjs
+    A = zblock(
+        A, pmx.conj(), pmy.conj(), pix, piy
+    )
+    # I.2 y direction
+    ypjs, yerrs, yds = yfindp(A, chi, chiM, chiII,
+                              cg_eps=cg_eps)
+    pmz, pox, piix = ypjs
+    A = yblock(
+        A, pmz.conj(), pox.conj(), pmz, piix
+    )
+    # I.3 x direction
+    xpjs, xerrs, xds = xfindp(A, chi,
+                              cg_eps=cg_eps)
+    poy, poz = xpjs
+    A = xblock(
+        A, poy.conj(), poz.conj(), poy, poz
+    )
+    if display:
+        print("Brief summary of block-tensor RG errors...")
+        print("I. Outmost errors: (χ = {:d})".format(chi))
+        print("x = {:.2e}, y = {:.2e}, z = {:.2e}".format(
+                  yerrs[1], xerrs[0], xerrs[1]
+              ))
+        print("II. Intermediate errors: (χm = {:d})".format(chiM))
+        print("x = {:.2e}, y = {:.2e}, z = {:.2e}".format(
+                  zerrs[0], zerrs[2], yerrs[0]
+              ))
+        print("III. Inner-cube errors:",
+              "(χi = {:d}, χii = {:d})".format(chiI, chiII))
+        print("xin = {:.2e}, yin = {:.2e}, xinin = {:.2e}".format(
+                  zerrs[1], zerrs[3], yerrs[2]
+              ))
+    return A, pox, poy, poz, xerrs, yerrs, zerrs
+
+
 # Useful for algorithm development
 def moErrs(A, chi, chiM, chiI, chiII,
            firsterr=True):
