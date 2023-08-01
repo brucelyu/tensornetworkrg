@@ -302,6 +302,7 @@ def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
         errMaxFlow.append(errMax)
         eeFlow.append([eexyz, eex, eey, eez])
         if tnrg_pars["display"]:
+            print("===")
             print("The RG step {:d} finished!".format(
                 tnrg3dCase.get_iteration())
                   )
