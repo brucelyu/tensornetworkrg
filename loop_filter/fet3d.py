@@ -144,7 +144,7 @@ def linUpdateMats(octuP, octuGamma, sold, PsiPsi,
         # errNew = cubeFidelity(snew, Pnew, Gammanew, PsiPsi)[1]
         errNew = cubeError(octuP, octuGamma, snew, PsiPsi)
         # once the FET error reduces, we update s matrix
-        if (errNew <= errOld) or (errNew < epsilon):
+        if (errNew <= errOld) or (errNew < epsilon) or (p == 10):
             sM = snew / snew.norm()
             break
     return sM, errNew, errOld
@@ -166,12 +166,14 @@ def opt_1s(octuP, octuGamma, sold, PsiPsi,
             err.append(errNew)
         else:
             err.append(errNew)
+        if errNew < epsilon:
+            break
     return snew, err
 
 
 # II.4 Put all optimization functions together
 def opt_alls(A, sx, sy, sz, PsiPsi, epsilon=1e-10,
-             iter_max=20, n_round=2):
+             iter_max=20, n_round=2, display=True):
     """find sx, sy, sz to maximaize FET fidelity
 
     Args:
@@ -215,9 +217,11 @@ def opt_alls(A, sx, sy, sz, PsiPsi, epsilon=1e-10,
                 sx = snew * 1.0
             # record error
             errList.append(err)
-            print("This is round {:d} for leg {:s}:".format(m+1, leg),
-                  "FET Error {:.2e} ---> {:.2e}".format(err[1], err[-1])
-                  )
+            if display:
+                print("This is round {:d} for leg {:s}:".format(m+1, leg),
+                      "FET Error {:.2e} ---> {:.2e}".format(err[1], err[-1]),
+                      "(in {:d} iterations)".format(len(err) - 1)
+                      )
     return sx, sy, sz, errList
 
 
