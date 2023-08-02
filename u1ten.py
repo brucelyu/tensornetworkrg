@@ -47,8 +47,10 @@ def pinv(B, a=[0, 1], b=[2, 3], eps_mach=1e-10,
         return invtensor
 
     if not soft:
+        if chiCut is not None:
+            chiCut = [k+1 for k in range(chiCut)]
         d, U = B.eig(a, b, hermitian=True,
-                     chis=[k+1 for k in range(chiCut)],
+                     chis=chiCut,
                      eps=eps_mach)
     else:
         # perform no truncation here but soft inverse below
