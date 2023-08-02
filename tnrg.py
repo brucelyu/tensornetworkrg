@@ -878,12 +878,22 @@ class TensorNetworkRG3D(TensorNetworkRG):
         Ps = env3d.cubePs(Aout, sx, sy, sz, direction="y")
         Gammas = env3d.cubeGammas(Aout, sx, sy, sz, direction="y")
         errFET0 = fet3d.cubeFidelity(sy, Ps, Gammas, PsiPsi)[1]
-        if display:
-            print("Initial FET error for insertion of",
-                  "s matrices is {:.2e}".format(errFET0))
         # I.2 Optimization of sx, sy, sz matrices
         # TODO
-
+        (
+            sx, sy, sz, fetErrList
+         ) = fet3d.opt_alls(Aout, sx, sy, sz, PsiPsi,
+                            epsilon=cg_eps,
+                            iter_max=10, n_round=2)
+        # FET fidelity after optimization of s matrices
+        Ps = env3d.cubePs(Aout, sx, sy, sz, direction="y")
+        Gammas = env3d.cubeGammas(Aout, sx, sy, sz, direction="y")
+        errFET1 = fet3d.cubeFidelity(sy, Ps, Gammas, PsiPsi)[1]
+        if display:
+            print("  Initial FET error for insertion of",
+                  "s matrices is {:.2e}".format(errFET0))
+            print("    Final FET error for insertion of",
+                  "s matrices is {:.2e}".format(errFET1))
         # II. coarse graining
         # II.1 Absorb sx, sy, sz to (+++)-position tensor
         Aout = fet3d.absbs(Aout, sx, sy, sz)
@@ -906,7 +916,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
 
         # return approximation errors
         # no loop-filtering error
-        lrerr = [errFET0]
+        lrerr = [errFET0, errFET1]
         rgerr = [zerrs, yerrs, xerrs]
         return lrerr, rgerr
 
