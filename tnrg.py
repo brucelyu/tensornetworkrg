@@ -819,11 +819,21 @@ class TensorNetworkRG3D(TensorNetworkRG):
         Aold = self.get_tensor()
         (
             Aout, pox, poy, poz,
+            pmx, pmy, pmz,
+            pix, piy, piix,
             xerrs, yerrs, zerrs
          ) = bkten3d.blockrg(
             Aold, chi, chiM, chiI, chiII,
             cg_eps, display
         )
+
+        # II. Sign fixing:
+        if signFix:
+            (
+                Aout, pox, poy, poz
+            ) = bkten3d.signFix(Aout, Aold,
+                                pox, poy, poz,
+                                verbose=display)
 
         # update current outmost isometries (for gauge usage)
         self.isometry_applied = [pox, poy, poz]
@@ -879,12 +889,13 @@ class TensorNetworkRG3D(TensorNetworkRG):
         Gammas = env3d.cubeGammas(Aout, sx, sy, sz, direction="y")
         errFET0 = fet3d.cubeFidelity(sy, Ps, Gammas, PsiPsi)[1]
         # I.2 Optimization of sx, sy, sz matrices
-        # TODO
+        # TODO: How to set the hyper-parameters in FET optimization?
         (
             sx, sy, sz, fetErrList
          ) = fet3d.opt_alls(Aout, sx, sy, sz, PsiPsi,
                             epsilon=cg_eps,
-                            iter_max=10, n_round=2)
+                            iter_max=10, n_round=2,
+                            display=display)
         # FET fidelity after optimization of s matrices
         Ps = env3d.cubePs(Aout, sx, sy, sz, direction="y")
         Gammas = env3d.cubeGammas(Aout, sx, sy, sz, direction="y")
@@ -900,11 +911,21 @@ class TensorNetworkRG3D(TensorNetworkRG):
         # II.2 Apply block-tensor transformation
         (
             Aout, pox, poy, poz,
+            pmx, pmy, pmz,
+            pix, piy, piix,
             xerrs, yerrs, zerrs
          ) = bkten3d.blockrg(
             Aout, chi, chiM, chiI, chiII,
             cg_eps, display
         )
+
+        # III. Sign fixing:
+        if signFix:
+            (
+                Aout, pox, poy, poz
+            ) = bkten3d.signFix(Aout, Aold,
+                                pox, poy, poz,
+                                verbose=display)
 
         # update current outmost isometries (for gauge usage)
         self.isometry_applied = [pox, poy, poz]

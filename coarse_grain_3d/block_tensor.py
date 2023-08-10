@@ -15,9 +15,10 @@ A HOTRG-like block-tensor coarse graining method
     of a cube of 8 copies of input tensor.
 What's more, the reflection symmetry is exactly imposed here.
 """
-from .hotrg import zCollapseXproj
 from ncon import ncon
 import numpy as np
+from .hotrg import zCollapseXproj
+from . import signfix as sf
 
 
 # I. For determing isometric tensors
@@ -234,7 +235,43 @@ def blockrg(A, chi, chiM, chiI, chiII,
         print("x-direction RG spectrum is")
         xarr = -np.sort(-yds[1].to_ndarray())
         print(xarr/xarr[0])
-    return A, pox, poy, poz, xerrs, yerrs, zerrs
+    return (A, pox, poy, poz, pmx, pmy, pmz,
+            pix, piy, piix, xerrs, yerrs, zerrs)
+
+
+# IV. Sign fixing
+def signFix(Aout, Aold, pox, poy, poz,
+            verbose=True):
+    # only do the fixing if the shape if
+    # 1) Aout and A have the same shape
+    if (Aout.shape == Aold.shape):
+        if verbose:
+            print("---------------")
+            print("Sign fixing...")
+        (
+            Aout,
+            signx, signy, signz
+        ) = sf.findSigns(Aout, Aold, verbose=verbose)
+        # absorb three sign matrices into the
+        # outmost isometric tensors
+        pox, poy, poz = signOnPout(
+            pox, poy, poz,
+            signx, signy, signz
+        )
+    return Aout, pox, poy, poz
+
+
+def signOnPout(pox, poy, poz, signx, signy, signz):
+    pox = pox.multiply_diag(
+        signx, axis=2, direction="r"
+    )
+    poy = poy.multiply_diag(
+        signy, axis=2, direction="r"
+    )
+    poz = poz.multiply_diag(
+        signz, axis=2, direction="r"
+    )
+    return pox, poy, poz
 
 
 # Useful for algorithm development
