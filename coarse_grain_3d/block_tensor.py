@@ -136,17 +136,25 @@ def xfindp(Azy, chi, cg_eps=1e-8):
 
 # II. For block-tensor transformation along a single direction
 
+def zblock2ten(A, B, pxc, pyc, px, py, comm=None):
+    # contraction for coarse graining process
+    # This version has computation cost O(chi^11) and
+    # memory cost O(chi^8). The memory cost can be reduced to O(chi^6).
+    if comm is None:
+        Aout = ncon([A, B.conj(), pxc, pyc, px, py],
+                    [[1, 2, 6, 7, -5, 5], [8, 9, 3, 4, -6, 5],
+                     [1, 8, -1], [6, 3, -3], [2, 9, -2], [7, 4, -4]
+                     ])
+    return Aout
+
+
 # All 1-direction tensor contraction is calling this as prototype
 # including `yblock` and `xblock`
 def zblock(A, pxc, pyc, px, py, comm=None):
     # contraction for coarse graining process
     # This version has computation cost O(chi^11) and
     # memory cost O(chi^8). The memory cost can be reduced to O(chi^6).
-    if comm is None:
-        Aout = ncon([A, A.conj(), pxc, pyc, px, py],
-                    [[1, 2, 6, 7, -5, 5], [8, 9, 3, 4, -6, 5],
-                     [1, 8, -1], [6, 3, -3], [2, 9, -2], [7, 4, -4]
-                     ])
+    Aout = zblock2ten(A, A, pxc, pyc, px, py, comm)
     return Aout
 
 
@@ -272,6 +280,111 @@ def signOnPout(pox, poy, poz, signx, signy, signz):
         signz, axis=2, direction="r"
     )
     return pox, poy, poz
+
+
+# V. Linearization of the block-tensor RG transformation
+# In this procedure, all isometric tensors are treated as known objects
+def fullContr(A, isom_all, comm=None):
+    """Full contraction of block-tensor transformation
+    This is almost the same as `blockrg`
+
+    Args:
+        A (TensorCommon): 6-leg main tensor
+        isom_all (List): list of isometric tensors
+
+    Kwargs:
+        comm (MPI.COMM_WORLD): for parallelization
+
+    Returns:
+        Aps (List): [A, A', A'', A''']
+        - Coarse tensors after z-direction,
+        y-direction, and x-direction contractions
+        if we choose z -> y -> x order
+        - final output tensor is Aout = A'''
+
+    """
+    # read all the isometric tensors
+    [pox, poy, poz, pmx, pmy, pmz, pix, piy, piix] = isom_all
+    Az = zblock(
+                A, pmx.conj(), pmy.conj(), pix, piy
+    )
+    Azy = yblock(
+                Az, pmz.conj(), pox.conj(), pmz, piix
+    )
+    Azyx = xblock(
+                Azy, poy.conj(), poz.conj(), poy, poz
+    )
+    return A, Az, Azy, Azyx
+
+
+def linrgmap(deltaA, Astar_all, isom_all,
+             relf_c=[0, 0, 0], comm=None):
+    """Construct linearized block-tensor RG equation
+    Lattice-reflection symmetry is utilized here to
+    build linearized RG in different charge sectors.
+
+    Args:
+        deltaA (TensorCommon): 6-leg tensor
+            perturbation to the fixed-point tensor
+        Astar_all (List): [A, Az, Azy, Azyx]
+            Fix-point tensor and its intermediate
+            renormalized ones
+        isom_all (List): list of isometric tensors
+
+    Kwargs:
+        relf_c (list): lattice-reflection charge
+            Choose among: [0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]
+                          [1, 1, 0], [1, 0, 1], [0, 1, 1], [1, 1, 1]
+        comm (MPI.COMM_WORLD): for parallelization
+
+    Returns:
+        deltaAc (TensorCommon): 6-leg tensor
+            renormalized perturbation
+    """
+    [pox, poy, poz, pmx, pmy, pmz, pix, piy, piix] = isom_all
+    [A, Az, Azy, Azyx] = Astar_all
+    cX, cY, cZ = relf_c
+    c2sign = {0: 1, 1: -1}
+    # I. z-direction linearization
+    # call `zblock2ten` to contract
+    deltaAz = (
+        zblock2ten(
+            deltaA, A, pmx.conj(), pmy.conj(), pix, piy, comm
+        ) +
+        c2sign[cZ] * zblock2ten(
+            A, deltaA, pmx.conj(), pmy.conj(), pix, piy, comm
+        )
+    )
+    # II. y-direction linearization
+    # rotate to the prototpye position
+    # rotation xyz --> zxy
+    Azr = Az.transpose([4, 5, 0, 1, 2, 3])
+    deltaAzr = deltaAz.transpose([4, 5, 0, 1, 2, 3])
+    # call `zblock2ten` to contract
+    deltaAzy = (
+        zblock2ten(
+            deltaAzr, Azr, pmz.conj(), pox.conj(), pmx, piix, comm
+        ) +
+        c2sign[cY] * zblock2ten(
+            Azr, deltaAzr, pmz.conj(), pox.conj(), pmx, piix, comm
+        )
+    )
+    # III. x-direction linearization
+    # rotate to the prototpye position
+    Azyr = Azy.transpose([2, 3, 4, 5, 0, 1])
+    deltaAzyr = deltaAzy.transpose([4, 5, 0, 1, 2, 3])
+    # call `zblock2ten` to contract
+    deltaAc = (
+        zblock2ten(
+            deltaAzyr, Azyr, poy.conj(), poz.conj(), poy, poz, comm
+        ) +
+        c2sign[cX] * zblock2ten(
+            Azyr, deltaAzyr, poy.conj(), poz.conj(), poy, poz, comm
+        )
+    )
+    # rotate back to absolute position
+    deltaAc = deltaAc.transpose([4, 5, 0, 1, 2, 3])
+    return deltaAc
 
 
 # Useful for algorithm development
