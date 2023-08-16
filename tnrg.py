@@ -835,8 +835,10 @@ class TensorNetworkRG3D(TensorNetworkRG):
                                 pox, poy, poz,
                                 verbose=display)
 
-        # update current outmost isometries (for gauge usage)
-        self.isometry_applied = [pox, poy, poz]
+        # update the isometric tensors for block-tensor RG
+        self.isometry_applied = [pox, poy, poz,
+                                 pmx, pmy, pmz,
+                                 pix, piy, piix]
         # update the current tensor
         self.current_tensor = Aout * 1.0
         # pull out the tensor norm and save
@@ -899,13 +901,19 @@ class TensorNetworkRG3D(TensorNetworkRG):
         # FET fidelity after optimization of s matrices
         Ps = env3d.cubePs(Aout, sx, sy, sz, direction="y")
         Gammas = env3d.cubeGammas(Aout, sx, sy, sz, direction="y")
-        errFET1 = fet3d.cubeFidelity(sy, Ps, Gammas, PsiPsi)[1]
+        errFET1, PhiPhi1 = fet3d.cubeFidelity(sy, Ps, Gammas, PsiPsi)[1:]
         if display:
             print("  Initial FET error for insertion of",
                   "s matrices is {:.2e}".format(errFET0))
             print("    Final FET error for insertion of",
                   "s matrices is {:.2e}".format(errFET1))
         # II. coarse graining
+        # II. Take care the overall magnitude of sx, sy, sz to
+        # make sure that <ψ|ψ> = <φ|φ>
+        PsiDivPhi = (PsiPsi / PhiPhi1).norm()
+        sx = sx * (PsiDivPhi)**(1/24)
+        sy = sy * (PsiDivPhi)**(1/24)
+        sz = sz * (PsiDivPhi)**(1/24)
         # II.1 Absorb sx, sy, sz to (+++)-position tensor
         Aout = fet3d.absbs(Aout, sx, sy, sz)
         # II.2 Apply block-tensor transformation
@@ -975,6 +983,68 @@ class TensorNetworkRG3D(TensorNetworkRG):
                                           signFix=gaugeFix,
                                           comm=comm)
         return lferrs, SPerrs
+
+    # linearized RG maps
+    @staticmethod
+    def linear_hotrg(Astar, cgten,
+                     comm=None):
+        """
+        Z2 symmetry imposed here:
+        Astar and tensors in cgten should be Z2-symmetric
+        """
+        # I. generate all the middle tensors during a RG step
+        AstarPiece = hotrg3d.fullContr(Astar, cgten, comm=comm)
+        AstarPiece = AstarPiece[:-1]
+        # II. construct linearized RG for both sectors
+
+        # II.1 For change-0 (Even) sector
+        AstarArray = u1ten.Z2toArray(Astar)[0]
+        dim_ch0PsiA = AstarArray.shape[0]
+
+        # define the response matrix for deltaA with charge = 0
+        def linearRG0(deltaPsiA):
+            # reshape the numpy array into Z2-symmetric tensor with charge = 0
+            deltaAch0 = u1ten.arraytoZ2(deltaPsiA, Astar)
+            # map from deltaAch0 --> deltaAcch0
+            deltaAcch0 = hotrg3d.linrgmap(deltaAch0, AstarPiece, cgten,
+                                          comm=comm)
+            # reshape the output deltaAcch0 back into a 1D array
+            deltaPsiAc = u1ten.Z2toArray(deltaAcch0)[0]
+            return deltaPsiAc
+
+        # II.2 For charge-1 (Odd) sector
+        # create empty tensor with the same shape as Astar but
+        # with charge = 1
+        Aemptch1 = Astar.empty_like()
+        Aemptch1.charge = 1
+        Aemptch1Array = u1ten.Z2toArray(Aemptch1)[0]
+        dim_ch1PsiA = Aemptch1Array.shape[0]
+
+        # define the response matrix for deltaA with charge = 1
+        def linearRG1(deltaPsiA):
+            # reshape the numpy array into Z2-symmetric tensor with charge = 1
+            deltaAch1 = u1ten.arraytoZ2(deltaPsiA, Aemptch1)
+            # map from deltaAch1 --> deltaAcch1
+            deltaAcch1 = hotrg3d.linrgmap(deltaAch1, AstarPiece, cgten,
+                                          comm=comm)
+            # reshape the output deltaAcch1 back into a 1D array
+            deltaPsiAc = u1ten.Z2toArray(deltaAcch1)[0]
+            return deltaPsiAc
+
+        # III. Return linear RG maps and dimensions of the maps
+        linearRGSet = [linearRG0, linearRG1]
+        dims_PsiA = [dim_ch0PsiA, dim_ch1PsiA]
+        return linearRGSet, dims_PsiA
+
+    @staticmethod
+    def linear_block_hotrg(Astar, cgten,
+                           comm=None):
+        pass
+
+    @staticmethod
+    def linear_entfree_blockrg(Astar, cgten,
+                               comm=None):
+        pass
 
     def eval_free_energy(self, initial_spin=1, b=2):
         """
