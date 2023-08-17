@@ -911,9 +911,9 @@ class TensorNetworkRG3D(TensorNetworkRG):
         # II. Take care the overall magnitude of sx, sy, sz to
         # make sure that <ψ|ψ> = <φ|φ>
         PsiDivPhi = (PsiPsi / PhiPhi1).norm()
-        sx = sx * (PsiDivPhi)**(1/24)
-        sy = sy * (PsiDivPhi)**(1/24)
-        sz = sz * (PsiDivPhi)**(1/24)
+        sx = sx * (PsiDivPhi)**(1/48)
+        sy = sy * (PsiDivPhi)**(1/48)
+        sz = sz * (PsiDivPhi)**(1/48)
         # II.1 Absorb sx, sy, sz to (+++)-position tensor
         Aout = fet3d.absbs(Aout, sx, sy, sz)
         # II.2 Apply block-tensor transformation
