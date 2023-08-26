@@ -717,7 +717,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
         ee = spstats.entropy(pk, base=2)
         return ee, s
 
-    # coarse graining methods
+    # I. coarse graining methods
     def hotrg(
         self,
         pars={"chi": 4, "cg_eps": 1e-16,
@@ -984,7 +984,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
                                           comm=comm)
         return lferrs, SPerrs
 
-    # linearized RG maps
+    # II. linearized RG maps
     @staticmethod
     def linear_hotrg(Astar, cgten,
                      comm=None):
@@ -995,8 +995,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
         # I. generate all the middle tensors during a RG step
         AstarPiece = hotrg3d.fullContr(Astar, cgten, comm=comm)
         AstarPiece = AstarPiece[:-1]
-        # II. construct linearized RG for both sectors
 
+        # II. construct linearized RG for both sectors
         # II.1 For change-0 (Even) sector
         AstarArray = u1ten.Z2toArray(Astar)[0]
         dim_ch0PsiA = AstarArray.shape[0]
@@ -1037,9 +1037,51 @@ class TensorNetworkRG3D(TensorNetworkRG):
         return linearRGSet, dims_PsiA
 
     @staticmethod
-    def linear_block_hotrg(Astar, cgten,
+    def linear_block_hotrg(Astar, cgten, refl_c=[0, 0, 0],
                            comm=None):
-        pass
+        # I. generate all the middle tensors during a RG step
+        Astar_all = bkten3d.fullContr(Astar, cgten, comm=comm)
+
+        # II. construct linearized RG for both sectors
+        # II.1 For Spin-flip charge-0 (Even) sector
+        # dimensionality of the linear map
+        AstarArray = u1ten.Z2toArray(Astar)[0]
+        dim_ch0PsiA = AstarArray.shape[0]
+
+        # define the response matrix for deltaA with charge = 0
+        def linearRG0(deltaPsiA):
+            # reshape the numpy array into Z2-symmetric tensor with charge = 0
+            deltaAch0 = u1ten.arraytoZ2(deltaPsiA, Astar)
+            # Linear map: deltaAch0 --> deltaAcch0
+            deltaAcch0 = bkten3d.linrgmap(deltaAch0, Astar_all, cgten,
+                                          refl_c, comm=comm)
+            # reshape the output deltaAcch0 back into a 1D array
+            deltaPsiAc = u1ten.Z2toArray(deltaAcch0)[0]
+            return deltaPsiAc
+
+        # II.2 For charge-1 (Odd) sector
+        # create empty tensor with the same shape as Astar but
+        # with charge = 1
+        Aemptch1 = Astar.empty_like()
+        Aemptch1.charge = 1
+        Aemptch1Array = u1ten.Z2toArray(Aemptch1)[0]
+        dim_ch1PsiA = Aemptch1Array.shape[0]
+
+        # define the response matrix for deltaA with charge = 1
+        def linearRG1(deltaPsiA):
+            # reshape the numpy array into Z2-symmetric tensor with charge = 1
+            deltaAch1 = u1ten.arraytoZ2(deltaPsiA, Aemptch1)
+            # map from deltaAch1 --> deltaAcch1
+            deltaAcch1 = bkten3d.linrgmap(deltaAch1, Astar_all, cgten,
+                                          refl_c, comm=comm)
+            # reshape the output deltaAcch1 back into a 1D array
+            deltaPsiAc = u1ten.Z2toArray(deltaAcch1)[0]
+            return deltaPsiAc
+
+        # III. Return linear RG maps and dimensions of the maps
+        linearRGSet = [linearRG0, linearRG1]
+        dims_PsiA = [dim_ch0PsiA, dim_ch1PsiA]
+        return linearRGSet, dims_PsiA
 
     @staticmethod
     def linear_entfree_blockrg(Astar, cgten,

@@ -318,7 +318,7 @@ def fullContr(A, isom_all, comm=None):
 
 
 def linrgmap(deltaA, Astar_all, isom_all,
-             relf_c=[0, 0, 0], comm=None):
+             refl_c=[0, 0, 0], comm=None):
     """Construct linearized block-tensor RG equation
     Lattice-reflection symmetry is utilized here to
     build linearized RG in different charge sectors.
@@ -332,7 +332,7 @@ def linrgmap(deltaA, Astar_all, isom_all,
         isom_all (List): list of isometric tensors
 
     Kwargs:
-        relf_c (list): lattice-reflection charge
+        refl_c (list): lattice-reflection charge
             Choose among: [0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]
                           [1, 1, 0], [1, 0, 1], [0, 1, 1], [1, 1, 1]
         comm (MPI.COMM_WORLD): for parallelization
@@ -343,7 +343,7 @@ def linrgmap(deltaA, Astar_all, isom_all,
     """
     [pox, poy, poz, pmx, pmy, pmz, pix, piy, piix] = isom_all
     [A, Az, Azy, Azyx] = Astar_all
-    cX, cY, cZ = relf_c
+    cX, cY, cZ = refl_c
     c2sign = {0: 1, 1: -1}
     # I. z-direction linearization
     # call `zblock2ten` to contract
