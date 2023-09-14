@@ -29,6 +29,7 @@ import numpy as np
 from ncon import ncon
 
 
+# This is for isotropic block-tensor RG in 2D
 def opt_v(Ain, chi, dtol=1e-10):
     """
     Determine the squeezer v
@@ -129,7 +130,7 @@ def blockPlaq(Ain, v, w, vin):
     return Aout
 
 
-def reflSymHOTRG(Ain, chi, dtol=1e-10, horiSym=True):
+def reflSymHOTRG(Ain, chi, chiI=None, dtol=1e-10, horiSym=True):
     """coarse graining of 2D HOTRG that preserves reflection symmetry
     Block the following plaquette
         |     |
@@ -177,7 +178,7 @@ def reflSymHOTRG(Ain, chi, dtol=1e-10, horiSym=True):
         # determine vin by input Areflv*
         (vin,
          errvin
-         ) = opt_vDown(Areflvstar, chi, dtol)
+         ) = opt_vDown(Areflvstar, chiI, dtol)
     # finally we block Ain and v, vin, w and
     # get the coarser tensor
     Aout = blockPlaq(Ain, v, w, vin)
@@ -192,6 +193,7 @@ def reflSymHOTRG(Ain, chi, dtol=1e-10, horiSym=True):
 
 # --- The following three functions are for                       ---|
 # --- the rotationally-symmetric implmentation of the 2d HOTRG --    |
+
 
 def block4tensor(Ain, v):
     """
