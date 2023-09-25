@@ -141,11 +141,37 @@ def zblock2ten(A, B, pxc, pyc, px, py, comm=None):
     # This version has computation cost O(chi^11) and
     # memory cost O(chi^8). The memory cost can be reduced to O(chi^6).
     if comm is None:
-        Aout = ncon([A, B.conj(), pxc, pyc, px, py],
-                    [[1, 2, 6, 7, -5, 5], [8, 9, 3, 4, -6, 5],
+        Aout = ncon([A, B, pxc, pyc, px, py],
+                    [[1, 2, 6, 7, -5, 5], [8, 9, 3, 4, 5, -6],
                      [1, 8, -1], [6, 3, -3], [2, 9, -2], [7, 4, -4]
                      ])
     return Aout
+
+
+def yblock2ten(A, B, pzc, pxc, pz, px, comm=None):
+    perm = [4, 5, 0, 1, 2, 3]
+    inv_perm = [2, 3, 4, 5, 0, 1]
+    # Rotate to prototypical position
+    Ar = A.transpose(perm)
+    Br = B.transpose(perm)
+    # Call `zblock2ten` to contract
+    AB = zblock2ten(Ar, Br, pzc, pxc, pz, px, comm)
+    # Rotate back to absolute position
+    AB = AB.transpose(inv_perm)
+    return AB
+
+
+def xblock2ten(A, B, pyc, pzc, py, pz, comm=None):
+    perm = [2, 3, 4, 5, 0, 1]
+    inv_perm = [4, 5, 0, 1, 2, 3]
+    # Rotate to prototypical position
+    Ar = A.transpose(perm)
+    Br = B.transpose(perm)
+    # Call `zblock2ten` to contract
+    AB = zblock2ten(Ar, Br, pyc, pzc, py, pz, comm)
+    # Rotate back to absolute position
+    AB = AB.transpose(inv_perm)
+    return AB
 
 
 # All 1-direction tensor contraction is calling this as prototype
@@ -154,7 +180,8 @@ def zblock(A, pxc, pyc, px, py, comm=None):
     # contraction for coarse graining process
     # This version has computation cost O(chi^11) and
     # memory cost O(chi^8). The memory cost can be reduced to O(chi^6).
-    Aout = zblock2ten(A, A, pxc, pyc, px, py, comm)
+    Aout = zblock2ten(A, A.transpose([0, 1, 2, 3, 5, 4]).conj(),
+                      pxc, pyc, px, py, comm)
     return Aout
 
 
@@ -317,7 +344,7 @@ def fullContr(A, isom_all, comm=None):
     return A, Az, Azy, Azyx
 
 
-def linrgmap(deltaA, Astar_all, isom_all,
+def linrgmap_OLD(deltaA, Astar_all, isom_all,
              refl_c=[0, 0, 0], comm=None):
     """Construct linearized block-tensor RG equation
     Lattice-reflection symmetry is utilized here to
@@ -386,6 +413,69 @@ def linrgmap(deltaA, Astar_all, isom_all,
     deltaAc = deltaAc.transpose([4, 5, 0, 1, 2, 3])
     return deltaAc
 
+
+def linrgmap(dA, Astar_all, isom_all,
+             refl_c=[0, 0, 0], comm=None):
+    """Construct linearized block-tensor RG equation
+    Lattice-reflection symmetry is utilized here to
+    build linearized RG in different charge sectors.
+
+    Args:
+        deltaA (TensorCommon): 6-leg tensor
+            perturbation to the fixed-point tensor
+        Astar_all (List): [A, Az, Azy, Azyx]
+            Fix-point tensor and its intermediate
+            renormalized ones
+        isom_all (List): list of isometric tensors
+
+    Kwargs:
+        refl_c (list): lattice-reflection charge
+            Choose among: [0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]
+                          [1, 1, 0], [1, 0, 1], [0, 1, 1], [1, 1, 1]
+        comm (MPI.COMM_WORLD): for parallelization
+
+    Returns:
+        deltaAc (TensorCommon): 6-leg tensor
+            renormalized perturbation
+    """
+    [pox, poy, poz, pmx, pmy, pmz, pix, piy, piix] = isom_all
+    [A, Az, Azy, Azyx] = Astar_all
+    cX, cY, cZ = refl_c
+    c2sign = {0: 1, 1: -1}
+    # I. z-direction linearization
+    dAz = (
+        zblock2ten(
+            dA, A.transpose([0, 1, 2, 3, 5, 4]).conj(),
+            pmx.conj(), pmy.conj(), pix, piy, comm=comm
+        ) +
+        zblock2ten(
+            A, dA.transpose([0, 1, 2, 3, 5, 4]).conj(),
+            pmx.conj(), pmy.conj(), pix, piy, comm=comm
+        ) * c2sign[cZ]
+    )
+    # II. y-direction linearization
+    dAzy = (
+        yblock2ten(
+            dAz, Az.transpose([0, 1, 3, 2, 4, 5]).conj(),
+            pmz.conj(), pox.conj(), pmz, piix, comm=comm
+        ) +
+        yblock2ten(
+            Az, dAz.transpose([0, 1, 3, 2, 4, 5]).conj(),
+            pmz.conj(), pox.conj(), pmz, piix, comm=comm
+        ) * c2sign[cY]
+    )
+    # III. x-direction linearization
+    dAc = (
+        xblock2ten(
+            dAzy, Azy.transpose([1, 0, 2, 3, 4, 5]).conj(),
+            poy.conj(), poz.conj(), poy, poz, comm=comm
+        ) +
+        xblock2ten(
+            Azy, dAzy.transpose([1, 0, 2, 3, 4, 5]).conj(),
+            poy.conj(), poz.conj(), poy, poz, comm=comm
+        ) * c2sign[cX]
+    )
+    return dAc
 
 # Useful for algorithm development
 def moErrs(A, chi, chiM, chiI, chiII,
