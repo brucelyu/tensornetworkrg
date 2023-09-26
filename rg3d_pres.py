@@ -103,6 +103,10 @@ def findTc(iter_n=15, Tlow=4.0, Thi=5.0,
             plotXFlows(Xlow, Xhi, Xtry,
                        Tlow, Thi, Ttry,
                        saveFigName, curline, alpha=(k+1)/(iter_n+1))
+            print("This is the {:d}-th bisection step...".format(k + 1))
+            print("Critical Temperature is bounded by",
+                  "{:.5f} and {:.5f}".format(Tlow, Thi))
+            print("---")
         # ------/
         # update low and high bound
         if ishiT(Xtry[-1]):
