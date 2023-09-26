@@ -283,17 +283,17 @@ def linRG2scaleD(scheme="hotrg3d", ver="base", pars={},
             )
             scDims100 = linRG2x(
                 Astar, isom[k], scheme=scheme, ver="base",
-                nscaleD=[3, 2], comm=comm, refl_c=[1, 0, 0],
+                nscaleD=[3, 4], comm=comm, refl_c=[1, 0, 0],
                 sector=[None, idenEig]
             )
             scDims010 = linRG2x(
                 Astar, isom[k], scheme=scheme, ver="base",
-                nscaleD=[3, 2], comm=comm, refl_c=[0, 1, 0],
+                nscaleD=[3, 4], comm=comm, refl_c=[0, 1, 0],
                 sector=[None, idenEig]
             )
             scDims001 = linRG2x(
                 Astar, isom[k], scheme=scheme, ver="base",
-                nscaleD=[3, 2], comm=comm, refl_c=[0, 0, 1],
+                nscaleD=[3, 4], comm=comm, refl_c=[0, 0, 1],
                 sector=[None, idenEig]
             )
             scDims110 = linRG2x(
@@ -370,7 +370,7 @@ def linRG2scaleD(scheme="hotrg3d", ver="base", pars={},
                           "Lattice-reflection (100), (010) and (001) sector")
                     print("    ", scDims100[1], scDims010[1], scDims001[1])
                     print("    Expected values from CFT arguments are all")
-                    print("    ", [1.518, 3.518])
+                    print("    ", [1.518, 3.518, 3.518, 3.518])
                     print("    ---")
                     print("    ",
                           "Lattice-reflection (110), (101) and (011) sector")
