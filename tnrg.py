@@ -893,11 +893,12 @@ class TensorNetworkRG3D(TensorNetworkRG):
         errFET0 = fet3d.cubeFidelity(sy, Ps, Gammas, PsiPsi)[1]
         # I.2 Optimization of sx, sy, sz matrices
         # TODO: How to set the hyper-parameters in FET optimization?
+        fetloopN = min(50, chi**2 // 2)
         (
             sx, sy, sz, fetErrList
          ) = fet3d.opt_alls(Aout, sx, sy, sz, PsiPsi,
                             epsilon=cg_eps,
-                            iter_max=10, n_round=2,
+                            iter_max=fetloopN, n_round=3,
                             display=display)
         # FET fidelity after optimization of s matrices
         Ps = env3d.cubePs(Aout, sx, sy, sz, direction="y")
@@ -905,9 +906,9 @@ class TensorNetworkRG3D(TensorNetworkRG):
         errFET1, PhiPhi1 = fet3d.cubeFidelity(sy, Ps, Gammas, PsiPsi)[1:]
         if display:
             print("  Initial FET error for insertion of",
-                  "s matrices is {:.2e}".format(errFET0))
+                  "s matrices is {:.3e}".format(errFET0))
             print("    Final FET error for insertion of",
-                  "s matrices is {:.2e}".format(errFET1))
+                  "s matrices is {:.3e}".format(errFET1))
         # II. coarse graining
         # II. Take care the overall magnitude of sx, sy, sz to
         # make sure that <ψ|ψ> = <φ|φ>
