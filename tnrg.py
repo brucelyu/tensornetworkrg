@@ -3,7 +3,7 @@
 # File              : tnrg.py
 # Author            : Xinliang(Bruce) Lyu <lyu@issp.u-tokyo.ac.jp>
 # Date              : 20.05.2022
-# Last Modified Date: 20.05.2022
+# Last Modified Date: 27.09.2023
 # Last Modified By  : Xinliang(Bruce) Lyu <lyu@issp.u-tokyo.ac.jp>
 
 from scipy.sparse.linalg import eigs, LinearOperator
@@ -15,6 +15,7 @@ from .initial_tensor import initial_tensor
 from .coarse_grain_2d import trg_evenbly, tnr_evenbly, hotrg
 from .coarse_grain_3d import hotrg as hotrg3d
 from .coarse_grain_3d import block_tensor as bkten3d
+from .coarse_grain_3d import efrg as efrg3d
 from .loop_filter import cleanLoop, toymodels, fet3d, env3d
 from . import u1ten
 
@@ -935,8 +936,11 @@ class TensorNetworkRG3D(TensorNetworkRG):
                                 pox, poy, poz,
                                 verbose=display)
 
-        # update current outmost isometries (for gauge usage)
-        self.isometry_applied = [pox, poy, poz]
+        # update the isometric tensors for block-tensor RG
+        self.isometry_applied = [pox, poy, poz,
+                                 pmx, pmy, pmz,
+                                 pix, piy, piix,
+                                 sx, sy, sz]
         # update the current tensor
         self.current_tensor = Aout * 1.0
         # pull out the tensor norm and save
@@ -1038,9 +1042,15 @@ class TensorNetworkRG3D(TensorNetworkRG):
 
     @staticmethod
     def linear_block_hotrg(Astar, cgten, refl_c=[0, 0, 0],
-                           comm=None):
+                           comm=None,
+                           isEF=False):
         # I. generate all the middle tensors during a RG step
-        Astar_all = bkten3d.fullContr(Astar, cgten, comm=comm)
+        if not isEF:
+            # Case 1: 3D hotrg-like block-tensor
+            Astar_all = bkten3d.fullContr(Astar, cgten, comm=comm)
+        else:
+            # Case 2: add entanglement filtering
+            Astar_all = efrg3d.fullContr(Astar, cgten, comm=comm)
 
         # II. construct linearized RG for both sectors
         # II.1 For Spin-flip charge-0 (Even) sector
@@ -1052,9 +1062,21 @@ class TensorNetworkRG3D(TensorNetworkRG):
         def linearRG0(deltaPsiA):
             # reshape the numpy array into Z2-symmetric tensor with charge = 0
             deltaAch0 = u1ten.arraytoZ2(deltaPsiA, Astar)
+            # ------------------------------------\
             # Linear map: deltaAch0 --> deltaAcch0
-            deltaAcch0 = bkten3d.linrgmap(deltaAch0, Astar_all, cgten,
-                                          refl_c, comm=comm)
+            if not isEF:
+                # Case 1: 3D hotrg-like block-tensor
+                deltaAcch0 = bkten3d.linrgmap(
+                    deltaAch0, Astar_all, cgten,
+                    refl_c, comm=comm
+                )
+            else:
+                # Case 2: add entanglement filtering
+                deltaAcch0 = efrg3d.linrgmap(
+                    deltaAch0, Astar_all, cgten,
+                    refl_c, comm=comm
+                )
+            # ------------------------------------/
             # reshape the output deltaAcch0 back into a 1D array
             deltaPsiAc = u1ten.Z2toArray(deltaAcch0)[0]
             return deltaPsiAc
@@ -1071,9 +1093,21 @@ class TensorNetworkRG3D(TensorNetworkRG):
         def linearRG1(deltaPsiA):
             # reshape the numpy array into Z2-symmetric tensor with charge = 1
             deltaAch1 = u1ten.arraytoZ2(deltaPsiA, Aemptch1)
-            # map from deltaAch1 --> deltaAcch1
-            deltaAcch1 = bkten3d.linrgmap(deltaAch1, Astar_all, cgten,
-                                          refl_c, comm=comm)
+            # ------------------------------------\
+            # Linear map from deltaAch1 --> deltaAcch1
+            if not isEF:
+                # Case 1: 3D hotrg-like block-tensor
+                deltaAcch1 = bkten3d.linrgmap(
+                    deltaAch1, Astar_all, cgten,
+                    refl_c, comm=comm
+                )
+            else:
+                # Case 2: add entanglement filtering
+                deltaAcch1 = efrg3d.linrgmap(
+                    deltaAch1, Astar_all, cgten,
+                    refl_c, comm=comm
+                )
+            # ------------------------------------/
             # reshape the output deltaAcch1 back into a 1D array
             deltaPsiAc = u1ten.Z2toArray(deltaAcch1)[0]
             return deltaPsiAc
@@ -1083,10 +1117,6 @@ class TensorNetworkRG3D(TensorNetworkRG):
         dims_PsiA = [dim_ch0PsiA, dim_ch1PsiA]
         return linearRGSet, dims_PsiA
 
-    @staticmethod
-    def linear_entfree_blockrg(Astar, cgten,
-                               comm=None):
-        pass
 
     def eval_free_energy(self, initial_spin=1, b=2):
         """

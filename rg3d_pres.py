@@ -20,6 +20,7 @@ import time
 from . import benchmark, tnrg
 from .coarse_grain_3d import hotrg as hotrg3d
 from .coarse_grain_3d import block_tensor as bkten3d
+from .coarse_grain_3d import efrg as efrg3d
 
 
 def findTc(iter_n=15, Tlow=4.0, Thi=5.0,
@@ -258,6 +259,8 @@ def linRG2scaleD(scheme="hotrg3d", ver="base", pars={},
                 AoutCheck = hotrg3d.fullContr(Acur, isom[k], comm=comm)[-1]
             elif scheme == "blockHOTRG":
                 AoutCheck = bkten3d.fullContr(Acur, isom[k], comm=comm)[-1]
+            elif scheme == "efrg":
+                AoutCheck = efrg3d.fullContr(Acur, isom[k], comm=comm)[-1]
             AoutCheck = AoutCheck / AoutCheck.norm()
             checkDiff = (AoutCheck - Anxt).norm()
             errMsg = ("isometries have wrong gauge!" +
@@ -280,7 +283,7 @@ def linRG2scaleD(scheme="hotrg3d", ver="base", pars={},
                 nscaleD=[evenN, oddN], comm=comm)
             # save scaling dimensions
             scDList.append(scDims)
-        elif scheme == "blockHOTRG":
+        elif scheme in ["blockHOTRG", "efrg"]:
             scDims000, idenEig = linRG2x(
                 Astar, isom[k], scheme=scheme, ver="base",
                 nscaleD=[7, 5], comm=comm, refl_c=[0, 0, 0]
@@ -341,7 +344,7 @@ def linRG2scaleD(scheme="hotrg3d", ver="base", pars={},
                 print("The Exact values for 3D Ising odd sector are")
                 with np.printoptions(precision=5, suppress=True):
                     print(scDOddExt)
-            elif scheme == "blockHOTRG":
+            elif scheme in ["blockHOTRG", "efrg"]:
                 print("The scaling dimensions of spin-flip-EVEN operators are:")
                 with np.printoptions(precision=5, suppress=True):
                     print("    ",
@@ -362,6 +365,7 @@ def linRG2scaleD(scheme="hotrg3d", ver="base", pars={},
                     print("    Expected values from CFT arguments are all")
                     print("    ", [3, 3.413])
                 print("-----")
+                print()
                 print("The scaling dimensions of spin-flip-ODD operators are:")
                 with np.printoptions(precision=5, suppress=True):
                     print("    ",
@@ -382,6 +386,7 @@ def linRG2scaleD(scheme="hotrg3d", ver="base", pars={},
                     print("    Expected values from CFT arguments are all")
                     print("    ", [2.518, 4.518])
             print("\\--------------------/")
+            print()
 
     # save scaling dimensions
     if rank == 0:
@@ -542,10 +547,12 @@ def linRG2x(Astar, cgtens, scheme="hotrg3d", ver="base",
             Astar, cgtens, comm=comm)
     elif scheme == "blockHOTRG":
         linearRGSet, dims_PsiA = ising3d.linear_block_hotrg(
-            Astar, cgtens, refl_c, comm=comm
+            Astar, cgtens, refl_c, comm=comm, isEF=False
         )
     elif scheme == "efrg":
-        raise NotImplementedError("Not done yet!")
+        linearRGSet, dims_PsiA = ising3d.linear_block_hotrg(
+            Astar, cgtens, refl_c, comm=comm, isEF=True
+        )
 
     if sector[0] is None:
         # even and odd sector in series
@@ -563,7 +570,7 @@ def linRG2x(Astar, cgtens, scheme="hotrg3d", ver="base",
             else:
                 # for reflection-symmetric schemes
                 return scDims, baseEig
-        else:
+        else:  # for blockHOTRG and efrg
             scDimsEven = ising3d.linearRG2scaleD(
                 linearRGSet[0], dims_PsiA[0], nscaleD[0], baseEig=sector[1]
             )
