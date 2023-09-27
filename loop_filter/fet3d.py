@@ -227,7 +227,8 @@ def opt_alls(A, sx, sy, sz, PsiPsi, epsilon=1e-10,
                       )
             # if the change of FET error is small, the opt for the leg is done
             doneLegs[leg] = (
-                abs((err[-1] - err[1]) / err[1]) < (0.01 * iter_max/100)
+                abs((err[-1] - err[1]) / (err[1] + 1e-8)
+                    ) < (0.01 * iter_max/100)
             )
         if all(doneLegs.values()):
             break
