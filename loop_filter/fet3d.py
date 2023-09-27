@@ -198,12 +198,15 @@ def opt_alls(A, sx, sy, sz, PsiPsi, epsilon=1e-10,
     leg_list = ["y", "z", "x"]
     errList = []
     for m in range(n_round):
+        doneLegs = {k: False for k in leg_list}
         for leg in leg_list:
             Ap, sxp, syp, szp = env3d.cubePermute(
                 A, sx, sy, sz, direction=leg)
             # bottleneck of computational cost: O(χ^12)
             # we will do it 3 x n_round times
             octu4P, octu4Gamma = env3d.firstContr(Ap, sxp, szp)
+            if display:
+                print("χ^12 construction of envrionment finished!")
             # update the s-matrix for the given direction
             snew, err = opt_1s(
                 octu4P, octu4Gamma, syp, PsiPsi,
@@ -219,9 +222,16 @@ def opt_alls(A, sx, sy, sz, PsiPsi, epsilon=1e-10,
             errList.append(err)
             if display:
                 print("This is round {:d} for leg {:s}:".format(m+1, leg),
-                      "FET Error {:.2e} ---> {:.2e}".format(err[1], err[-1]),
+                      "FET Error {:.3e} ---> {:.3e}".format(err[1], err[-1]),
                       "(in {:d} iterations)".format(len(err) - 1)
                       )
+            # if the change of FET error is small, the opt for the leg is done
+            doneLegs[leg] = (
+                abs((err[-1] - err[1]) / err[1]) < (0.01 * iter_max/100)
+            )
+        if all(doneLegs.values()):
+            break
+
     return sx, sy, sz, errList
 
 
