@@ -893,12 +893,12 @@ class TensorNetworkRG3D(TensorNetworkRG):
         errFET0 = fet3d.cubeFidelity(sy, Ps, Gammas, PsiPsi)[1]
         # I.2 Optimization of sx, sy, sz matrices
         # TODO: How to set the hyper-parameters in FET optimization?
-        fetloopN = min(50, chi**2 // 2)
+        # fetloopN = min(50, chi**2 // 2)
         (
             sx, sy, sz, fetErrList
          ) = fet3d.opt_alls(Aout, sx, sy, sz, PsiPsi,
                             epsilon=cg_eps,
-                            iter_max=fetloopN, n_round=3,
+                            iter_max=5, n_round=20,
                             display=display)
         # FET fidelity after optimization of s matrices
         Ps = env3d.cubePs(Aout, sx, sy, sz, direction="y")

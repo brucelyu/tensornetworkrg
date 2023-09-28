@@ -205,8 +205,8 @@ def opt_alls(A, sx, sy, sz, PsiPsi, epsilon=1e-10,
             # bottleneck of computational cost: O(χ^12)
             # we will do it 3 x n_round times
             octu4P, octu4Gamma = env3d.firstContr(Ap, sxp, szp)
-            if display:
-                print("χ^12 construction of envrionment finished!")
+            # if display:
+            #     print("χ^12 construction of environment finished!")
             # update the s-matrix for the given direction
             snew, err = opt_1s(
                 octu4P, octu4Gamma, syp, PsiPsi,
@@ -220,7 +220,7 @@ def opt_alls(A, sx, sy, sz, PsiPsi, epsilon=1e-10,
                 sx = snew * 1.0
             # record error
             errList.append(err)
-            if display:
+            if display and (m % 5 == 0 or m == n_round - 1):
                 print("This is round {:d} for leg {:s}:".format(m+1, leg),
                       "FET Error {:.3e} ---> {:.3e}".format(err[1], err[-1]),
                       "(in {:d} iterations)".format(len(err) - 1)
