@@ -898,7 +898,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
             sx, sy, sz, fetErrList
          ) = fet3d.opt_alls(Aout, sx, sy, sz, PsiPsi,
                             epsilon=cg_eps,
-                            iter_max=5, n_round=20,
+                            iter_max=5, n_round=40,
                             display=display)
         # FET fidelity after optimization of s matrices
         Ps = env3d.cubePs(Aout, sx, sy, sz, direction="y")
