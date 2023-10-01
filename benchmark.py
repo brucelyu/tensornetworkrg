@@ -267,6 +267,10 @@ def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
                  )
 
     for k in range(rg_n):
+        if k < 2:
+            doChiSet = None
+        else:
+            doChiSet = chiSet
         (
          lrerrs,
          SPerrs
@@ -274,7 +278,7 @@ def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
                               scheme=scheme, ver=ver,
                               gaugeFix=gaugeFix,
                               comm=comm,
-                              chiSet=chiSet)
+                              chiSet=doChiSet)
         # save updated tesnor at rank-0 process
         if (dataDir is not None) and (rank == 0):
             fname = "A{:02d}.pkl".format(k + 1)
