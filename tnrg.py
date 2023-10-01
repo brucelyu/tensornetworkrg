@@ -858,7 +858,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
               "cg_eps": 1e-16, "display": True,
               "chis": 4, "chienv": 25, "epsilon": 1e-5},
         signFix=False,
-        comm=None
+        comm=None,
+        chiSet=None
             ):
         if self.iter_n == 0:
             self.boundary = "parallel"
@@ -926,7 +927,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
             xerrs, yerrs, zerrs
          ) = bkten3d.blockrg(
             Aout, chi, chiM, chiI, chiII,
-            cg_eps, display
+            cg_eps, display,
+             chiSet=chiSet
         )
 
         # III. Sign fixing:

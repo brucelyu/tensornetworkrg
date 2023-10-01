@@ -22,7 +22,8 @@ from . import signfix as sf
 
 
 # I. For determing isometric tensors
-def zfind1p(A, chi, which="pmx", cg_eps=1e-8):
+def zfind1p(A, chi, which="pmx", cg_eps=1e-8,
+            chiSet=None):
     # 0. For leg permutation
     # 0.1 For leg permutation in z direction
     permzleg = [0, 1, 2, 3, 5, 4]
@@ -49,7 +50,9 @@ def zfind1p(A, chi, which="pmx", cg_eps=1e-8):
         p, err, d
     ) = zCollapseXproj(
         Arela, Arela.transpose(permzleg).conj(),
-        chi)
+        chi, cg_eps=cg_eps,
+        chiSet=chiSet
+    )
     return p, err, d
 
 
@@ -85,7 +88,8 @@ def zfindp(A, chiM, chiI, cg_eps=1e-8):
     return zprojs, zerrs, zds
 
 
-def yfindp(Az, chi, chiM, chiII, cg_eps=1e-8):
+def yfindp(Az, chi, chiM, chiII, cg_eps=1e-8,
+           chiSet=None):
     """
     Projectors for y-direction coarse graining
     after z-direction block-tensor RG.
@@ -99,7 +103,8 @@ def yfindp(Az, chi, chiM, chiII, cg_eps=1e-8):
     # II. pox
     (
         pox, errox, dox
-    ) = zfind1p(Ar, chi, which="pmy", cg_eps=cg_eps)
+    ) = zfind1p(Ar, chi, which="pmy", cg_eps=cg_eps,
+                chiSet=chiSet)
     # III. piix
     (
         piix, erriix, diix
@@ -112,7 +117,8 @@ def yfindp(Az, chi, chiM, chiII, cg_eps=1e-8):
     return yprojs, yerrs, yds
 
 
-def xfindp(Azy, chi, cg_eps=1e-8):
+def xfindp(Azy, chi, cg_eps=1e-8,
+           chiSet=None):
     """
     Projectors for x-direction coarse graining
     after z- and y-direction block-tensor RG.
@@ -122,11 +128,13 @@ def xfindp(Azy, chi, cg_eps=1e-8):
     # I. poy
     (
         poy, erroy, doy
-    ) = zfind1p(Ar, chi, which="pmx", cg_eps=cg_eps)
+    ) = zfind1p(Ar, chi, which="pmx", cg_eps=cg_eps,
+                chiSet=chiSet)
     # II. poz
     (
         poz, erroz, doz
-    ) = zfind1p(Ar, chi, which="pmy", cg_eps=cg_eps)
+    ) = zfind1p(Ar, chi, which="pmy", cg_eps=cg_eps,
+                chiSet=chiSet)
     # group projectors
     xprojs = [poy, poz]
     xerrs = [erroy, erroz]
@@ -211,7 +219,8 @@ def xblock(Azy, pyc, pzc, py, pz, comm=None):
 
 # III. Full block-tensor transformation
 def blockrg(A, chi, chiM, chiI, chiII,
-            cg_eps=1e-10, display=True):
+            cg_eps=1e-10, display=True,
+            chiSet=None):
     """tensor coarse grain
 
     Args:
@@ -240,14 +249,16 @@ def blockrg(A, chi, chiM, chiI, chiII,
     )
     # I.2 y direction
     ypjs, yerrs, yds = yfindp(A, chi, chiM, chiII,
-                              cg_eps=cg_eps)
+                              cg_eps=cg_eps,
+                              chiSet=chiSet)
     pmz, pox, piix = ypjs
     A = yblock(
         A, pmz.conj(), pox.conj(), pmz, piix
     )
     # I.3 x direction
     xpjs, xerrs, xds = xfindp(A, chi,
-                              cg_eps=cg_eps)
+                              cg_eps=cg_eps,
+                              chiSet=chiSet)
     poy, poz = xpjs
     A = xblock(
         A, poy.conj(), poz.conj(), poy, poz

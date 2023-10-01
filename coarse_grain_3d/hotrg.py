@@ -209,7 +209,8 @@ def rotInd(direction):
     return perm, inv_perm
 
 
-def zCollapseXproj(A, B, chi, cg_eps=1e-8):
+def zCollapseXproj(A, B, chi, cg_eps=1e-8,
+                   chiSet=None):
     """construct the x projector for z-direction coarse graining
 
     Args:
@@ -226,6 +227,8 @@ def zCollapseXproj(A, B, chi, cg_eps=1e-8):
                  [[-1, 2, 3, 4, 1, 9], [-2, 6, 7, 8, 9, 5],
                   [-3, 2, 3, 4, 1, 10], [-4, 6, 7, 8, 10, 5]
                   ])
+    if chiSet is not None:
+        assert sum(chiSet) == chi
     (d,
      p,
      err
@@ -233,7 +236,14 @@ def zCollapseXproj(A, B, chi, cg_eps=1e-8):
                    hermitian=True,
                    chis=[i+1 for i in range(chi)], eps=cg_eps,
                    trunc_err_func=trunc_err_func,
-                   return_rel_err=True)
+                   return_rel_err=True,
+                   chiSet=chiSet)
+    if chiSet is not None:
+        # when the bond dimension is specified in Z2 sectors,
+        # need to recalculate the approximation error
+        pd = p.multiply_diag(d, axis=1, direction="r")
+        pdp = (ncon([pd, p.conj()], [[-1, 1], [-2, 1]]))
+        err = ((env_M - pdp).trace() / env_M.trace()).norm()
     return p, err, d
 
 
