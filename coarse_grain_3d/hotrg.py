@@ -242,7 +242,9 @@ def zCollapseXproj(A, B, chi, cg_eps=1e-8,
         # when the bond dimension is specified in Z2 sectors,
         # need to recalculate the approximation error
         pd = p.multiply_diag(d, axis=2, direction="r")
-        pdp = (ncon([pd, p.conj()], [[-1, 1], [-2, 1]]))
+        pdp = (ncon([pd, p.conj()], [[-1, -2, 1], [-3, -4, 1]]))
+        pdp = pdp.join_indices([0, 1], [2, 3], dirs=[1, -1])
+        env_M = env_M.join_indices([0, 1], [2, 3], dirs=[1, -1])
         err = ((env_M - pdp).trace() / env_M.trace()).norm()
     return p, err, d
 
