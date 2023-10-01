@@ -132,6 +132,8 @@ def linUpdateMats(octuP, octuGamma, sold, PsiPsi,
     # old FET error
     Ps, Gammas = env3d.secondContr(octuP, octuGamma, sold)
     errOld = cubeFidelity(sold, Ps, Gammas, PsiPsi)[1]
+    if errOld < epsilon:
+        return sold, errOld, errOld
     # propose a candidate s
     stemp = updateMats(Ps, Gammas, epsilon=epsilon)
     # normalized stemp (for the convex combination)
