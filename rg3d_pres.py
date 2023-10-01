@@ -26,7 +26,7 @@ from .coarse_grain_3d import efrg as efrg3d
 def findTc(iter_n=15, Tlow=4.0, Thi=5.0,
            scheme="hotrg3d", ver="base",
            pars={}, outDir="./",
-           comm=None):
+           comm=None, chiSet=None):
     # helper function 1: Is hi-T phase or low-T phase?
     def ishiT(x):
         dist2hi = np.abs(x - 1)
@@ -78,11 +78,13 @@ def findTc(iter_n=15, Tlow=4.0, Thi=5.0,
     Xlow = benchmark.benm3DIsing(Tlow, h=0,
                                  scheme=scheme, ver=ver,
                                  pars=pars,
-                                 comm=comm, noEE=True)[0]
+                                 comm=comm, noEE=True,
+                                 chiSet=chiSet)[0]
     Xhi = benchmark.benm3DIsing(Thi, h=0,
                                 scheme=scheme, ver=ver,
                                 pars=pars,
-                                comm=comm, noEE=True)[0]
+                                comm=comm, noEE=True,
+                                chiSet=chiSet)[0]
     # ---------------------\
     # plot at rank-0 process
     if rank == 0:
@@ -136,7 +138,7 @@ def findTc(iter_n=15, Tlow=4.0, Thi=5.0,
 
 def generateRGflow(scheme="hotrg3d", ver="base",
                    pars={}, outDir="./", plotRGmax=15,
-                   comm=None):
+                   comm=None, chiSet=None):
     """generate RG flow at critical temperature
 
     """
@@ -170,7 +172,8 @@ def generateRGflow(scheme="hotrg3d", ver="base",
                               scheme=scheme, ver=ver,
                               pars=pars,
                               gaugeFix=True,
-                              comm=comm)
+                              comm=comm,
+                              chiSet=chiSet)
     # Read and plot the flow of tensor difference
     # generate in `benm3DIsing` process
     # at rank-0 process

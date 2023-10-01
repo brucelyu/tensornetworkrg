@@ -124,7 +124,8 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
 def benm3DIsing(T=5.0, h=0, scheme="hotrg3d",
                 ver="base",
                 pars={}, gaugeFix=False,
-                comm=None, noEE=False):
+                comm=None, noEE=False,
+                chiSet=None):
     """
     Benchmark TNRG schemes on 3D Ising model by generating
     1) local approximation error RG flow
@@ -202,14 +203,15 @@ def benm3DIsing(T=5.0, h=0, scheme="hotrg3d",
                       tnrg_pars=pars, dataDir=pars["dataDir"],
                       determPhase=pars["determPhase"],
                       gaugeFix=gaugeFix,
-                      comm=comm, noEE=noEE)
+                      comm=comm, noEE=noEE,
+                      chiSet=chiSet)
     return XFlow, errMaxFlow, eeFlow, SPerrsFlow, lrerrsFlow
 
 
 def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
                   tnrg_pars={}, dataDir=None, determPhase=True,
                   gaugeFix=False, comm=None,
-                  noEE=False):
+                  noEE=False, chiSet=None):
     """
     Perform the 3D TNRG iteration
 
@@ -271,7 +273,8 @@ def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
          ) = tnrg3dCase.rgmap(tnrg_pars,
                               scheme=scheme, ver=ver,
                               gaugeFix=gaugeFix,
-                              comm=comm)
+                              comm=comm,
+                              chiSet=chiSet)
         # save updated tesnor at rank-0 process
         if (dataDir is not None) and (rank == 0):
             fname = "A{:02d}.pkl".format(k + 1)

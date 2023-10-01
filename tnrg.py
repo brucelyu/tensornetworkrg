@@ -959,7 +959,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
     def rgmap(self, tnrg_pars,
               scheme="hotrg3d", ver="base",
               gaugeFix=False,
-              comm=None):
+              comm=None,
+              chiSet=None):
         """
         coarse grain the tensors using schemes above
         - hotrg3d
@@ -988,7 +989,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
                  SPerrs
                  ) = self.entfree_blockrg(tnrg_pars,
                                           signFix=gaugeFix,
-                                          comm=comm)
+                                          comm=comm,
+                                          chiSet=chiSet)
         return lferrs, SPerrs
 
     # II. linearized RG maps
