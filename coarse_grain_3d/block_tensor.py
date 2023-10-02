@@ -270,11 +270,17 @@ def blockrg(A, chi, chiM, chiI, chiII,
                   yerrs[1], xerrs[0], xerrs[1]
               ))
         print("II. Intermediate errors: (χm = {:d})".format(chiM))
+        print("   Actually χmx = {}, χmy = {}, χmz = {}".format(
+            pmx.shape[2], pmy.shape[2], pmz.shape[2]
+        ))
         print("x = {:.2e}, y = {:.2e}, z = {:.2e}".format(
                   zerrs[0], zerrs[2], yerrs[0]
               ))
         print("III. Inner-cube errors:",
               "(χi = {:d}, χii = {:d})".format(chiI, chiII))
+        print("   Actually χix = {}, χiy = {}, χiix = {}".format(
+            pix.shape[2], piy.shape[2], piix.shape[2]
+        ))
         print("xin = {:.2e}, yin = {:.2e}, xinin = {:.2e}".format(
                   zerrs[1], zerrs[3], yerrs[2]
               ))
