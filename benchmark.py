@@ -266,11 +266,37 @@ def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
                  data=Aorg
                  )
 
+    if scheme == "efrg":
+        chiSave = tnrg_pars["chi"]
+        chisSave = tnrg_pars["chis"]
+        chienvSave = tnrg_pars["chienv"]
     for k in range(rg_n):
+        # Whether to specfiy the outer bond dimension between
+        # spin-flip Z2 charge sectors
         if k < 2:
             doChiSet = None
         else:
             doChiSet = chiSet
+        # For 3D Ising class, the first RG step only truncate
+        # the bond dimension to 6 for χ=7,8,9, due to
+        # the intrinsic property of the initial tensor.
+        # Therefore, for k=0,1, we always use the χ=6 parameter
+        # for χ=7,8,9
+        if (scheme == "efrg") and (chiSave in [7, 8, 9]):
+            if k == 0:
+                # first RG always set χ=6
+                tnrg_pars["chi"] = 6
+            elif k == 1:
+                # set χ back
+                tnrg_pars["chi"] = chiSave
+                # set χs and χenv to be 4 and 16
+                tnrg_pars["chis"] = 4
+                tnrg_pars["chienv"] = 16
+            else:
+                # set χs and χenv back
+                tnrg_pars["chis"] = chisSave
+                tnrg_pars["chienv"] = chienvSave
+
         (
          lrerrs,
          SPerrs
