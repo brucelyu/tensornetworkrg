@@ -186,6 +186,13 @@ def generateRGflow(scheme="hotrg3d", ver="base",
         # plot data
         plotTenDiff(Amags, tenDiff, ten3diagDiff, saveDir,
                     Ttry, hiRG=plotRGmax)
+        if scheme == "efrg":
+            # plot flow of RG errors
+            errFigFile = saveDir + "/errs_s{:d}M{:d}.png".format(
+                pars["chis"], pars["chiM"]
+            )
+            plotefrg(pars["chi"], lrerrsFlow, SPerrsFlow,
+                     0, plotRGmax, errFigFile)
 
 
 # linearize RG map and extracting scaling dimensions
@@ -715,3 +722,34 @@ def plotscaleD(rgsteps, scDList,
         plt.xlim([rgsteps[0] - 1, rgsteps[0] + 1])
     plt.savefig(saveDir + "/scDim.png",
                 bbox_inches='tight', dpi=300)
+
+
+def plotefrg(chi, lrerrsList, SPerrsList,
+             startn, endn, figFile):
+    # process lrerrsList and SPerrsList
+    SPplot = [[rgerr[1][1], rgerr[2][0], rgerr[2][1],
+               rgerr[0][0], rgerr[0][2], rgerr[1][0]] for rgerr in SPerrsList]
+    SPplot = np.array(SPplot)
+    lrerr = np.array(lrerrsList)
+    plt.figure(figsize=(10, 8))
+    ax1 = plt.subplot(211)
+    ax1.plot(SPplot[startn:endn, 0], "r+-", alpha=0.4, label="Outmost x")
+    ax1.plot(SPplot[startn:endn, 1], "yx-", alpha=0.4, label="Outmost y")
+    ax1.plot(SPplot[startn:endn, 2], "y+-", alpha=0.4, label="Outmost z")
+    ax1.plot(SPplot[startn:endn, 3], "bx-", alpha=0.4, label="Intermed x")
+    ax1.plot(SPplot[startn:endn, 4], "b+-", alpha=0.4, label="Intermed y")
+    ax1.plot(SPplot[startn:endn, 5], "rx-", alpha=0.4, label="Intermed z")
+    plt.ylabel("RG errors")
+    plt.yscale("log")
+    plt.title(r"$\chi = ${:d} (baby-FET + block-tensor)".format(chi))
+    plt.legend()
+    ax2 = plt.subplot(212)
+    ax2.plot(lrerr[startn:endn, 0], "g.--", alpha=0.4,
+             label="cube filtering (Initial)")
+    ax2.plot(lrerr[startn:endn, 1], "k.--", alpha=0.4,
+             label="cube filtering (After optimization)")
+    plt.ylabel("FET errors")
+    plt.yscale("log")
+    plt.legend()
+    plt.savefig(figFile, bbox_inches='tight',
+                dpi=300)
