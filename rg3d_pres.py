@@ -620,6 +620,13 @@ def saveDirName(scheme, ver, pars, outDir="./",
                "/" +
                "chi{:02d}".format(pars["chi"])
                )
+    # for EFRG
+    if scheme == "efrg":
+        saveDir = (outDir + "{:s}_{:s}_{:s}".format(scheme, ver, endword) +
+                   "/" +
+                   "chi{:02d}s{:d}M{:d}".format(
+                       pars["chi"], pars["chis"], pars["chiM"])
+                   )
     return saveDir
 
 
