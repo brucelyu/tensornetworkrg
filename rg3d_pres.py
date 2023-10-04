@@ -186,6 +186,16 @@ def generateRGflow(scheme="hotrg3d", ver="base",
         # plot data
         plotTenDiff(Amags, tenDiff, ten3diagDiff, saveDir,
                     Ttry, hiRG=plotRGmax)
+
+        # II. Save RG error flows
+        benchmark.saveData(
+            tenDir, "errflows.pkl",
+            data=[
+                pars["chi"], errMaxFlow, SPerrsFlow, lrerrsFlow,
+                eeFlow, XFlow
+            ]
+        )
+
         if scheme == "efrg":
             # plot flow of RG errors
             errFigFile = saveDir + "/errs_s{:d}M{:d}.png".format(
