@@ -422,7 +422,8 @@ def linRG2scaleD(scheme="hotrg3d", ver="base", pars={},
 
 def linRG2scaleD1rg(scheme="hotrg3d", ver="base", pars={},
                     rgn=3, scaleN=10, outDir="./", comm=None,
-                    sectorChoice="even"):
+                    sectorChoice="even",
+                    reflChoice="000"):
     def fixMagTen(A, Amag):
         # fix the tensor norm (optional)
         return A * (Amag**(-1/7))
@@ -443,10 +444,6 @@ def linRG2scaleD1rg(scheme="hotrg3d", ver="base", pars={},
     tenDir = tensorsDir(pars["dataDir"])
     isom, Amags = 0, 0
     if rank == 0:
-        scDEvenExt = [0, 1.413, 2.413, 2.413, 2.413,
-                      3, 3, 3, 3, 3]
-        scDOddExt = [0.518, 1.518, 1.518, 1.518,
-                     2.518, 2.518, 2.518, 2.518, 2.518, 2.518]
         tenFile = tenDir + "/tenflows.pkl"
         with open(tenFile, "rb") as f:
             alltens = pkl.load(f)
@@ -485,7 +482,12 @@ def linRG2scaleD1rg(scheme="hotrg3d", ver="base", pars={},
     # make sure Anxt and Acur are of same shape
     if Anxt.shape == Acur.shape:
         # check isometry correctness
-        AoutCheck = hotrg3d.fullContr(Acur, isom[rgn], comm=comm)[-1]
+        if scheme == "hotrg3d":
+            AoutCheck = hotrg3d.fullContr(Acur, isom[rgn], comm=comm)[-1]
+        elif scheme == "blockHOTRG":
+            AoutCheck = bkten3d.fullContr(Acur, isom[rgn], comm=comm)[-1]
+        elif scheme == "efrg":
+            AoutCheck = efrg3d.fullContr(Acur, isom[rgn], comm=comm)[-1]
         AoutCheck = AoutCheck / AoutCheck.norm()
         checkDiff = (AoutCheck - Anxt).norm()
         errMsg = ("isometries have wrong gauge!" +
@@ -500,22 +502,49 @@ def linRG2scaleD1rg(scheme="hotrg3d", ver="base", pars={},
 
     # fix the norm of the tensor (optional)
     Astar = fixMagTen(Acur, Amags[rgn])
-    # read the base eigenvalue
-    if sectorChoice == "even":
-        sector = [sectorChoice, None]
-    elif sectorChoice == "odd":
-        baseEig = 1
-        if rank == 0:
-            scDFile = tenDir + "/scDim-rg{:02d}-even.pkl".format(rgn)
-            with open(scDFile, "rb") as f:
-                baseEig = pkl.load(f)[2]
-        if comm is not None:
-            baseEig = comm.bcast(baseEig, root=0)
-        sector = [sectorChoice, baseEig]
-    # find scaling dimensions
-    scDims, baseEig = linRG2x(
-        Astar, isom[rgn], scheme="hotrg3d", ver="base",
-        nscaleD=scaleN, comm=comm, sector=sector)
+
+    # From linearized RG to scaling dimensions
+    if scheme == "hotrg3d":
+        # read the base eigenvalue
+        if sectorChoice == "even":
+            sector = [sectorChoice, None]
+        elif sectorChoice == "odd":
+            baseEig = 1
+            if rank == 0:
+                scDFile = tenDir + "/scDim-rg{:02d}-even.pkl".format(rgn)
+                with open(scDFile, "rb") as f:
+                    baseEig = pkl.load(f)[2]
+            if comm is not None:
+                baseEig = comm.bcast(baseEig, root=0)
+            sector = [sectorChoice, baseEig]
+        # find scaling dimensions
+        scDims, baseEig = linRG2x(
+            Astar, isom[rgn], scheme="hotrg3d", ver="base",
+            nscaleD=scaleN, comm=comm, sector=sector)
+
+    elif scheme in ["blockHOTRG", "efrg"]:
+        refl_dic = {
+            "000": [0, 0, 0],
+            "100": [1, 0, 0], "010": [0, 1, 0], "001": [0, 0, 1],
+            "110": [1, 1, 0], "101": [1, 0, 1], "011": [0, 1, 1],
+        }
+        # read the base eigenvalue
+        if (sectorChoice == "even") and (reflChoice == "000"):
+            sector = [sectorChoice, None]
+        else:
+            baseEig = 1
+            if rank == 0:
+                scDFile = tenDir + "/scDim-rg{:02d}-even000.pkl".format(rgn)
+                with open(scDFile, "rb") as f:
+                    baseEig = pkl.load(f)[2]
+            if comm is not None:
+                baseEig = comm.bcast(baseEig, root=0)
+            sector = [sectorChoice, baseEig]
+        # find scaling dimensions
+        scDims, baseEig = linRG2x(
+            Astar, isom[rgn], scheme=scheme, ver="base",
+            nscaleD=scaleN, comm=comm, sector=sector,
+            refl_c=refl_dic[reflChoice])
 
     # print out scaling dimensions and time elapsed
     if rank == 0:
@@ -523,23 +552,60 @@ def linRG2scaleD1rg(scheme="hotrg3d", ver="base", pars={},
         endT = time.time()
         diffT = endT - startT
         print("finished! Time elapsed = {:.2f}".format(diffT))
-        if sector[0] == "even":
-            print("The scaling dimensions of even operators are:")
+
+        if scheme == "hotrg3d":
+            scDEvenExt = [0, 1.413, 2.413, 2.413, 2.413,
+                          3, 3, 3, 3, 3]
+            scDOddExt = [0.518, 1.518, 1.518, 1.518,
+                         2.518, 2.518, 2.518, 2.518, 2.518, 2.518]
+            if sector[0] == "even":
+                print("The scaling dimensions of even operators are:")
+                with np.printoptions(precision=5, suppress=True):
+                    print(scDims)
+                print("The Exact values for 3D Ising even sector are")
+                with np.printoptions(precision=5, suppress=True):
+                    print(scDEvenExt)
+            if sector[0] == "odd":
+                print("The scaling dimensions of odd operators are:")
+                with np.printoptions(precision=5, suppress=True):
+                    print(scDims)
+                print("The Exact values for 3D Ising odd sector are")
+                with np.printoptions(precision=5, suppress=True):
+                    print(scDOddExt)
+        elif scheme in ["blockHOTRG", "efrg"]:
+            print("The scaling dimensions with")
+            print("    spin-flip-{:s}".format(sector[0]),
+                  "and Lattice-reflection-({:s}):".format(reflChoice)
+                  )
             with np.printoptions(precision=5, suppress=True):
-                print(scDims)
-            print("The Exact values for 3D Ising even sector are")
-            with np.printoptions(precision=5, suppress=True):
-                print(scDEvenExt)
-        if sector[0] == "odd":
-            print("The scaling dimensions of odd operators are:")
-            with np.printoptions(precision=5, suppress=True):
-                print(scDims)
-            print("The Exact values for 3D Ising odd sector are")
-            with np.printoptions(precision=5, suppress=True):
-                print(scDOddExt)
+                print("    ", scDims)
+            print()
+            print("    Expected values from CFT arguments are")
+            if sector[0] == "even":
+                if reflChoice == "000":
+                    print("    ", [0, 1.413, 3, 3, 3.413, 3.413, 3.413])
+                elif reflChoice in ["100", "010", "001"]:
+                    print("    ", [2.413, 4, 4])
+                elif reflChoice in ["110", "101", "011"]:
+                    print("    ", [3, 3.413])
+            elif sector[0] == "odd":
+                if reflChoice == "000":
+                    print("    ", [0.518, 2.518, 2.518, 2.518, 4.518])
+                elif reflChoice in ["100", "010", "001"]:
+                    print("    ", [1.518, 3.518, 3.518, 3.518])
+                elif reflChoice in ["110", "101", "011"]:
+                    print("    ", [2.518, 4.518])
         print("\\--------------------/")
+
         # save scaling dimensions
-        scDFile = tenDir + "/scDim-rg{:02d}-{:s}.pkl".format(rgn, sector[0])
+        if scheme == "hotrg3d":
+            scDFile = tenDir + "/scDim-rg{:02d}-{:s}.pkl".format(
+                rgn, sector[0]
+            )
+        elif scheme in ["blockHOTRG", "efrg"]:
+            scDFile = tenDir + "/scDim-rg{:02d}-{:s}{:s}.pkl".format(
+                rgn, sector[0], reflChoice
+            )
         with open(scDFile, "wb") as f:
             pkl.dump([rgn, scDims, baseEig], f)
 
@@ -600,13 +666,20 @@ def linRG2x(Astar, cgtens, scheme="hotrg3d", ver="base",
             scDims = [scDimsEven, scDimsOdd]
             return scDims
     else:
-        # separately (only for hotrg3d now)
-        if sector[0] == "even":
+        # separately
+        if (sector[0] == "even") and (refl_c == [0, 0, 0]):
             scDimsEven, baseEig = ising3d.linearRG2scaleD(
                 linearRGSet[0], dims_PsiA[0], nscaleD, baseEig=None
             )
             return scDimsEven, baseEig
+        elif sector[0] == "even":
+            # For spin-even & (100), (010), (001), (110), (101), (011), (111)
+            scDimsEven = ising3d.linearRG2scaleD(
+                linearRGSet[0], dims_PsiA[0], nscaleD, baseEig=sector[1]
+            )
+            return scDimsEven, sector[1]
         elif sector[0] == "odd":
+            # For spin-odd
             scDimsOdd = ising3d.linearRG2scaleD(
                 linearRGSet[1], dims_PsiA[1], nscaleD, baseEig=sector[1]
             )
