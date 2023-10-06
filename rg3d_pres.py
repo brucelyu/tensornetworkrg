@@ -840,6 +840,7 @@ def plotefrg(chi, lrerrsList, SPerrsList,
              label="cube filtering (After optimization)")
     plt.ylabel("FET errors")
     plt.yscale("log")
+    plt.ylim([1e-4, 1e-1])
     plt.legend()
     plt.savefig(figFile, bbox_inches='tight',
                 dpi=300)
