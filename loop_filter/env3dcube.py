@@ -102,7 +102,8 @@ def contrz(quadrA, quadrB):
         quadrA (TensorCommon): 8-leg tensor
         quadrB (TensorCommon): 8-leg tensor
 
-    Returns: TODO
+    Returns:
+        octuA (TensorCommon): 8-leg tensor
 
     """
     octuA = ncon([quadrA, quadrB],
@@ -190,10 +191,11 @@ def octu2P(octuA, sy):
     do the sy contraction first
 
     Args:
-        octuA (TODO): TODO
-        sy (TODO): TODO
+        octuA (TensorCommon): 8-leg tensor
+        sy (TensorCommon): 2-leg tensor
 
-    Returns: TODO
+    Returns:
+        Psy (TensorCommon)
 
     """
     Psy0 = ncon([octuA, octuA.conj()],
@@ -201,3 +203,23 @@ def octu2P(octuA, sy):
                  [-2, 1, 2, 3, 4, 5, 6, 7]])
     Psy_dagger = ncon([Psy0, sy.conj()], [[-1, 1], [1, -2]])
     return Psy_dagger.conj()
+
+
+def octu2gm(octuA, sy):
+    """construct γ matrix from octuple tensor
+
+    Args:
+        octuA (TensorCommon): 8-leg tensor
+        sy (TensorCommon): 2-leg tensor
+
+    Returns:
+        Gamma (TensorCommon)
+
+    """
+    Gamma0 = ncon([octuA, octuA.conj()],
+                  [[-3, -1, 1, 2, 3, 4, 5, 6],
+                   [-4, -2, 1, 2, 3, 4, 5, 6]]
+                  )
+    Gamma = ncon([Gamma0, sy, sy.conj()],
+                 [[-1, 1, -3, 2], [1, -2], [2, -4]])
+    return Gamma
