@@ -18,7 +18,7 @@ two entanglement-filtering schemes:
 2) Graph-independent local truncations (GILT)
 
 There are two filtering matrices:,
-    sx, sy
+    mx, my
 for each directions.
 The prototyical case is the environments after linearizing the sy.
 Other two cases should be obtained by
