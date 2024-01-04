@@ -75,8 +75,9 @@ def contrx(dbA, dbB):
     return quadrA
 
 
-def loopGamma(A, direction="y"):
+def loopGamma(A):
     """loop-filtering γ environment for initialization (GILT)
+    It is for the prototypical case: y leg in z-loop
 
     Args:
         A (TensorCommon): 6-leg tensor
