@@ -226,10 +226,13 @@ def dbA2FETenv(dbAp, dbAgm, my):
 
 # VI. Rotate the tensor to other directions, including
 # - x leg in z-loop
-def swapxy(A, mx, my):
+def swapxy(A, mx, my, isSwap=True):
     """ Swap x and y direction
     """
-    Ap = A.transpose([2, 3, 0, 1, 4, 5])
-    mxp = my * 1.0
-    myp = mx * 1.0
-    return Ap, mxp, myp
+    if isSwap:
+        Ap = A.transpose([2, 3, 0, 1, 4, 5])
+        mxp = my * 1.0
+        myp = mx * 1.0
+        return Ap, mxp, myp
+    else:
+        return A, mx, my
