@@ -172,7 +172,8 @@ def optimize_zloop(A, mx, my, PsiPsi, epsilon=1e-10,
 
 
 def optimize_yloop(A, mz, PsiPsi, epsilon=1e-10,
-                   iter_max=100, display=True):
+                   iter_max=100, display=True,
+                   checkStep=10):
     """find mz matrices that maximize FET fidelity
     y-loop is approximated here
     Similar to the above `init_zloopm` function but
@@ -183,7 +184,40 @@ def optimize_yloop(A, mz, PsiPsi, epsilon=1e-10,
     Returns: mz
 
     """
-    return mz
+    errList = []
+    doneLeg = False
+    # rotate the tensor leg: xyz --> zxy
+    Ap = A.transpose([4, 5, 0, 1, 2, 3])
+    # (Swap zx leg)
+    Ap = env3dloop.swapxy(Ap, 1, 1)[0]
+    # number of leg to be optimized
+    nleg = 1
+    for k in range(iter_max):
+        dbA = env3dloop.contrInLeg(Ap, Ap.conj())
+        # using FET to optimize the mz matrix
+        mz, err = optimize_single(dbA, dbA, mz, PsiPsi, epsilon)
+        # record FET error
+        errList.append(err)
+        # check the change of FET error
+        if display and (k % checkStep == 0 or k == iter_max - 1):
+            print("Iteration {:d}.".format(k+1),
+                  "FET Error (y-loop) is {:.3e} (leg z)".format(
+                      err)
+                  )
+            # if the change of FET error is small,
+            # the optimization for the leg is done
+            if k > 0:
+                smallChange = (
+                    abs((errList[-1] - errList[-1 - nleg*checkStep]) / (
+                        errList[-1 - nleg * checkStep] + epsilon)
+                        ) < (0.01 * nleg * checkStep / 100)
+                )
+                doneLeg = (
+                    smallChange or (abs(errList[-1]) < epsilon)
+                )
+        if doneLeg:
+            break
+    return mz, errList
 
 
 def optimize_single(dbAp, dbAgm, mold, PsiPsi, epsilon):
@@ -249,3 +283,16 @@ def absb_mloopz(Az, mx, my):
         [[1, -2, 2, -4, -5, -6], [1, -1], [2, -3]]
     )
     return Azm
+
+
+# A2. For y-loop filtering: mz
+def absb_mloopy(Azy, mz):
+    """
+    Apply mx, my matricx to
+        Az: intermediate tensor after the first z-collapse
+    """
+    Azym = ncon(
+        [Azy, mz, mz.conj()],
+        [[-1, -2, -3, -4, 1, 2], [1, -5], [2, -6]]
+    )
+    return Azym
