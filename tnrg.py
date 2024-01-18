@@ -16,7 +16,9 @@ from .coarse_grain_2d import trg_evenbly, tnr_evenbly, hotrg
 from .coarse_grain_3d import hotrg as hotrg3d
 from .coarse_grain_3d import block_tensor as bkten3d
 from .coarse_grain_3d import efrg as efrg3d
-from .loop_filter import cleanLoop, toymodels, fet3d, env3d
+from .loop_filter import (
+    cleanLoop, toymodels, fet3d, env3d, fet3dcube, fet3dloop
+)
 from . import u1ten
 
 
@@ -955,6 +957,274 @@ class TensorNetworkRG3D(TensorNetworkRG):
         lrerr = [errFET0, errFET1]
         rgerr = [zerrs, yerrs, xerrs]
         return lrerr, rgerr
+
+    def ef2stp_blockrg(
+        self,
+        pars={"chi": 6, "chiM": 6, "chiI": 15, "chiII": 36,
+              "cg_eps": 1e-16, "display": True,
+              "chis": 4, "chienv": 25, "epsilon": 1e-5,
+              "chiMs": 4, "chiMenv": 25, "epsilonM": 1e-5},
+        cubeFilter=True,
+        loopFilter=True,
+        signFix=False,
+        comm=None,
+        chiSet=None
+            ):
+        if self.iter_n == 0:
+            self.boundary = "parallel"
+        # 0.1 load the current tensor
+        Aold = self.get_tensor()
+        Aout = Aold * 1.0
+        # 0.2 read parameters for block-tensor
+        chi = pars["chi"]
+        chiM = pars["chiM"]
+        chiI = pars["chiI"]
+        chiII = pars["chiII"]
+        cg_eps = pars["cg_eps"]
+        display = pars["display"]
+
+        if display:
+            print("====================")
+            print("Start {:d} RG step...".format(self.iter_n))
+        # -----~~~>> Entanglement Filtering
+        # (E.1) cube-filtering on input tensor `A`
+        # Approximate 8-copies of `A` forming a cube
+        # determine sx, sy, sz matrices and apply them
+        # on the 3 outer legs of the input tensor `A`
+        if cubeFilter:
+            if display:
+                print("  >>~~~~Cube-Filter~~~~~~>>")
+            # (E.1)S0: Read parameters for cube-filtering
+            chis = pars["chis"]
+            chienv = pars["chienv"]
+            epsilonCube = pars["epsilon"]
+            # (E.1)S1: Initialize sx, sy, sz matrices (a GILT-like method)
+            (
+                sx, sy, sz,
+                Lrx, Lry, Lrz, Gammay
+            ) = fet3d.init_alls(Aout, chis, chienv, epsilonCube)
+            if display:
+                print("Shape of initial sx is {}.".format(sx.shape))
+                print("Shape of initial sy is {}.".format(sy.shape))
+                print("Shape of initial sz is {}.".format(sz.shape))
+
+            # (E.1)S2: Optimize sx, sy, sz matrices using FET
+            # - Compute <ψ|ψ> for calculating initialization fidelity
+            PsiPsiCube = ncon([Gammay], [[1, 1, 2, 2]])
+            # - FET fidelity of inserting initial s matrices
+            err0Cube = fet3dcube.fidelity(Aout, sx, sy, sz, PsiPsiCube)[1]
+            # - Optimization of sx, sy, sz matrices
+            (
+                sx, sy, sz, cubeErrList
+             ) = fet3dcube.optimize_alls(
+                 Aout, sx, sy, sz, PsiPsiCube, epsilon=cg_eps,
+                 iter_max=200, display=display
+             )
+            # - FET fidelity after optimization of s matrices
+            (err1Cube, PhiPhi1) = fet3dcube.fidelity(
+                Aout, sx, sy, sz, PsiPsiCube)[1:]
+            if display:
+                print("  Initial FET error for insertion of",
+                      "s matrices is {:.3e}".format(err0Cube))
+                print("    Final FET error for insertion of",
+                      "s matrices is {:.3e}".format(err1Cube))
+
+            # (E.1)S3: Absorb sx, sy, sz into the initial tensor A
+            # - Take care the overall magnitude of sx, sy, sz to
+            # make sure that <ψ|ψ> = <φ|φ>.
+            # - This magnitude contributes to the total free energy
+            # but is not essential for the conformal data.
+            PsiDivPhi = (PsiPsiCube / PhiPhi1).norm()
+            # - Factor 48 since there are 48 s matrices in <φ|φ>
+            sx = sx * (PsiDivPhi)**(1/48)
+            sy = sy * (PsiDivPhi)**(1/48)
+            sz = sz * (PsiDivPhi)**(1/48)
+            # - Absorb sx, sy, sz to (+++)-position tensor
+            # so its three outer legs are squeezed due to filtering
+            Aout = fet3d.absbs(Aout, sx, sy, sz)
+            if display:
+                print("  <<~~~~~~~~~~<<")
+        else:
+            sx, sy, sz = [1 for k in range(3)]
+            err0Cube, err1Cube = [0 for k in range(2)]
+        # -----~~~<<
+
+        # -----\
+        # (C.1) z-direction coarse graining
+        # (C.1)S1: Determine 2-to-1 isometric tensors
+        zpjs, zerrs, zds = bkten3d.zfindp(
+            Aout, chiM, chiI, cg_eps=cg_eps
+        )
+        pmx, pix, pmy, piy = zpjs
+        # (C.1)S2: Collapse two `A` tensor using isometric tensors
+        Aout = bkten3d.zblock(
+            Aout, pmx.conj(), pmy.conj(), pix, piy
+        )
+        # -----/
+
+        # -----~~~>>
+        # (E.2.1) loop-filtering on z-collapsed tensor `Az`
+        # Approximate 4-copies of `Az` forming a plaquette (loop)
+        # Determine mx, my matrices and apply them
+        # on the outer x and y legs of `Az`
+        if loopFilter:
+            if display:
+                print("  >>~~~~Z-Loop-Filter~~~~~~>>")
+            # (E.2.1)S0: Read parameters for cube-filtering
+            chiMs = pars["chiMs"]
+            chiMenv = pars["chiMenv"]
+            epsilonM = pars["epsilonM"]
+            # (E.2.1)S1: Initialize mx, my matrices (a GILT-like method)
+            (
+                mx, my,
+                mLrx, mLry, GammaLPZy
+            ) = fet3dloop.init_zloopm(Aout, chiMs, chiMenv, epsilonM)
+            if display:
+                print("Shape of initial mx is {}.".format(mx.shape))
+                print("Shape of initial my is {}.".format(my.shape))
+
+            # (E.2.1)S2: Optimize mx, my matrices using FET
+            # - Compute <ψ|ψ> for calculating initialization fidelity
+            PsiPsiLPZ = ncon([GammaLPZy], [[1, 1, 2, 2]])
+            # - FET fidelity of inserting initial s matrices
+            err0LPZ = fet3dloop.fidelityLPZ(Aout, mx, my, PsiPsiLPZ)[1]
+            # - Optimization of mx, my matrices
+            (
+                mx, my, ErrListLPZ
+            ) = fet3dloop.optimize_zloop(
+                Aout, mx, my, PsiPsiLPZ, epsilon=cg_eps,
+                iter_max=100, checkStep=20
+            )
+            # - FET fidelity after optimization of mx, my matrices
+            (err1LPZ, PhiPhiLPZ) = fet3dloop.fidelityLPZ(
+                Aout, mx, my, PsiPsiLPZ)[1:]
+            if display:
+                print("  Initial FET error for insertion of",
+                      "mx, my matrices is {:.3e}".format(err0LPZ))
+                print("    Final FET error for insertion of",
+                      "mx, my matrices is {:.3e}".format(err1LPZ))
+
+            # (E.2.1)S3: Absorb mx, my into the tensor Az
+            # - Take care the overall magnitude of mx, my to
+            # make sure that <ψ|ψ> = <φ|φ>.
+            # - This magnitude contributes to the total free energy
+            # but is not essential for the conformal data.
+            PsiDivPhi = (PsiPsiLPZ / PhiPhiLPZ).norm()
+            # - Factor 16 since there are 16 m matrices in <φ|φ>
+            mx = mx * (PsiDivPhi)**(1/16)
+            my = my * (PsiDivPhi)**(1/16)
+            # - Absorb mx, my to two outer legs of
+            # (++)-position tensor Az
+            # so the two legs are squeezed due to filtering
+            Aout = fet3dloop.absb_mloopz(Aout, mx, my)
+            if display:
+                print("  <<~~~~~~~~~~<<")
+        else:
+            mx, my = [1 for k in range(2)]
+            err0LPZ, err1LPZ = [0 for k in range(2)]
+        # -----~~~<<
+
+        # -----\
+        # (C.2) y-direction coarse graining
+        # (C.2) Step 1: Determine 2-to-1 isometric tensors
+        ypjs, yerrs, yds = bkten3d.yfindp(
+            Aout, chi, chiM, chiII, cg_eps=cg_eps, chiSet=chiSet
+        )
+        pmz, pox, piix = ypjs
+        # (C.2) Step 2: Collapse two `A` tensor using isometric tensors
+        Aout = bkten3d.yblock(
+            Aout, pmz.conj(), pox.conj(), pmz, piix
+        )
+        # -----/
+
+        # -----~~~>>
+        # (E.2.2) loop-filtering on zy-collapsed tensor `Azy`
+        # Approximate 4-copies of `Azy` forming a plaquette (loop)
+        # Determine mz matrices and apply it
+        # on both z-direction legs of `Azy`
+        if loopFilter:
+            if display:
+                print("  >>~~~~Y-Loop-Filter~~~~~~>>")
+            # (E.2.2)S1: Initialize mz matrix (a GILT-like method)
+            (
+                mz, mLrz, GammaLPYz
+            ) = fet3dloop.init_yloopm(Aout, chiMs, chiMenv, epsilonM)
+            if display:
+                print("Shape of initial mz is {}.".format(mz.shape))
+
+            # (E.2.2)S2: Optimize mz matrix using FET
+            # - Compute <ψ|ψ> for calculating initialization fidelity
+            PsiPsiLPY = ncon([GammaLPYz], [[1, 1, 2, 2]])
+            # - FET fidelity of inserting initial mz matrix
+            err0LPY = fet3dloop.fidelityLPY(Aout, mz, PsiPsiLPY)[1]
+            # - Optimization of mz matrix
+            (
+                mz, ErrListLPY
+            ) = fet3dloop.optimize_yloop(
+                Aout, mz, PsiPsiLPY, epsilon=cg_eps,
+                iter_max=100, checkStep=20
+            )
+            # - FET fidelity after optimization of mz matrix
+            (err1LPY, PhiPhiLPY) = fet3dloop.fidelityLPY(
+                Aout, mz, PsiPsiLPY)[1:]
+            if display:
+                print("  Initial FET error for insertion of",
+                      "mz matrices is {:.3e}".format(err0LPY))
+                print("    Final FET error for insertion of",
+                      "mz matrices is {:.3e}".format(err1LPY))
+
+            # (E.2.2)S3: Absorb mz into the tensor Azy
+            # - Take care the overall magnitude of mz to
+            # make sure that <ψ|ψ> = <φ|φ>.
+            # - This magnitude contributes to the total free energy
+            # but is not essential for the conformal data.
+            PsiDivPhi = (PsiPsiLPY / PhiPhiLPY).norm()
+            # - Factor 8 since there are 8 mz matrices in <φ|φ>
+            mz = mz * (PsiDivPhi)**(1/8)
+            # - Absorb mz to two z legs of
+            # (+)-position tensor Azy
+            # so the two legs are squeezed due to filtering
+            Aout = fet3dloop.absb_mloopy(Aout, mz)
+        else:
+            mz = 1
+            err0LPY, err1LPY = [0 for k in range(2)]
+        # -----~~~<<
+
+        # -----\
+        # (C.3) x-direction coarse graining
+        # (C.3) Step 1: Determine 2-to-1 isometric tensors
+        xpjs, xerrs, xds = bkten3d.xfindp(
+            Aout, chi, cg_eps=cg_eps, chiSet=chiSet
+        )
+        poy, poz = xpjs
+        # (C.3) Step 2: Collapse two `A` tensor using isometric tensors
+        Aout = bkten3d.xblock(
+            Aout, poy.conj(), poz.conj(), poy, poz
+        )
+        # -----/
+
+        # update the isometric tensors for block-tensor RG
+        self.isometry_applied = [
+            pox, poy, poz, pmx, pmy, pmz, pix, piy, piix,
+            sx, sy, sz, mx, my, mz
+        ]
+        # update the current tensor
+        self.current_tensor = Aout * 1.0
+        # pull out the tensor norm and save
+        ten_mag = self.pullout_magnitude()
+        self.save_tensor_magnitude(ten_mag)
+
+        # return approximation errors
+        # Entanglement filtering errors, including
+        # - Cube filtering
+        # - Loop filtering
+        lrerr = [[err0Cube, err1Cube],
+                 [err0LPZ, err1LPZ],
+                 [err0LPY, err1LPY]]
+        # block-tensor RG errors
+        rgerr = [zerrs, yerrs, xerrs]
+        return lrerr, rgerr
+
 
     def rgmap(self, tnrg_pars,
               scheme="hotrg3d", ver="base",
