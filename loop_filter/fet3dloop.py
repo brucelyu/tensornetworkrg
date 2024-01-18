@@ -296,3 +296,23 @@ def absb_mloopy(Azy, mz):
         [[-1, -2, -3, -4, 1, 2], [1, -5], [2, -6]]
     )
     return Azym
+
+
+# Fidelity of z-loop and y-loop
+def fidelityLPZ(Az, mx, my, PsiPsi):
+    dbA = env3dloop.contrInLeg(Az, Az.conj())
+    dbAp, dbAgm = env3dloop.mxAssemble(dbA, mx)
+    Pmy, Gammamy = env3dloop.dbA2FETenv(dbAp, dbAgm, my)
+    f, err, PhiPhi = fet3d.cubeFidelity(my, Pmy, Gammamy, PsiPsi)
+    return f, err, PhiPhi
+
+
+def fidelityLPY(Azy, mz, PsiPsi):
+    # rotate the tensor leg: xyz --> zxy
+    Azyr = Azy.transpose([4, 5, 0, 1, 2, 3])
+    # swap (zx) legs
+    Azyr = env3dloop.swapxy(Azyr, 1, 1)[0]
+    dbA = env3dloop.contrInLeg(Azyr, Azyr.conj())
+    Pmz, Gammamz = env3dloop.dbA2FETenv(dbA, dbA, mz)
+    f, err, PhiPhi = fet3d.cubeFidelity(mz, Pmz, Gammamz, PsiPsi)
+    return f, err, PhiPhi

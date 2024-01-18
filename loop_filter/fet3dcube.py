@@ -149,3 +149,10 @@ def optimize_single(dbAp, dbAgm, sold, PsiPsi, epsilon):
             snew = snew / snew.norm()
             break
     return snew, errNew
+
+
+def fidelity(A, sx, sy, sz, PsiPsi):
+    Ps = env3d.cubePs(A, sx, sy, sz, direction="y")
+    Gammas = env3d.cubeGammas(A, sx, sy, sz, direction="y")
+    f, err, PhiPhi = fet3d.cubeFidelity(sy, Ps, Gammas, PsiPsi)
+    return f, err, PhiPhi
