@@ -150,11 +150,10 @@ def optimize_zloop(A, mx, my, PsiPsi, epsilon=1e-10,
             # record FET error
             errList.append(err)
             # check the change of FET error
-            if display and (k % checkStep == 0 or k == iter_max - 1):
-                print("Iteration {:d}.".format(k+1),
-                      "FET Error (loop) is {:.3e} (leg {:s})".format(
-                          err, legDic[isSwap])
-                      )
+            if (k % checkStep == 0 or k == iter_max - 1):
+                # if the FET error is small,
+                # the optimization for the leg is done
+                doneLegs[isSwap] = (abs(errList[-1]) < epsilon)
                 # if the change of FET error is small,
                 # the optimization for the leg is done
                 if k > 0:
@@ -164,8 +163,14 @@ def optimize_zloop(A, mx, my, PsiPsi, epsilon=1e-10,
                             ) < (0.01 * nleg * checkStep / 100)
                     )
                     doneLegs[isSwap] = (
-                        smallChange or (abs(errList[-1]) < epsilon)
+                        smallChange or doneLegs[isSwap]
                     )
+                # print out the change of FET error if needed
+                if display:
+                    print("Iteration {:d}.".format(k+1),
+                          "FET Error (loop) is {:.3e} (leg {:s})".format(
+                              err, legDic[isSwap])
+                          )
         if all(doneLegs.values()):
             break
     return mx, my, errList
@@ -199,11 +204,10 @@ def optimize_yloop(A, mz, PsiPsi, epsilon=1e-10,
         # record FET error
         errList.append(err)
         # check the change of FET error
-        if display and (k % checkStep == 0 or k == iter_max - 1):
-            print("Iteration {:d}.".format(k+1),
-                  "FET Error (y-loop) is {:.3e} (leg z)".format(
-                      err)
-                  )
+        if (k % checkStep == 0 or k == iter_max - 1):
+            # if the FET error is small,
+            # the optimization for the leg is done
+            doneLeg = (abs(errList[-1]) < epsilon)
             # if the change of FET error is small,
             # the optimization for the leg is done
             if k > 0:
@@ -213,8 +217,13 @@ def optimize_yloop(A, mz, PsiPsi, epsilon=1e-10,
                         ) < (0.01 * nleg * checkStep / 100)
                 )
                 doneLeg = (
-                    smallChange or (abs(errList[-1]) < epsilon)
+                    smallChange or doneLeg
                 )
+            if display:
+                print("Iteration {:d}.".format(k+1),
+                      "FET Error (y-loop) is {:.3e} (leg z)".format(
+                          err)
+                      )
         if doneLeg:
             break
     return mz, errList

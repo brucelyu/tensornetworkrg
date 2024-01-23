@@ -25,7 +25,8 @@ from . import env3dcube, env3d, fet3d
 
 
 def optimize_alls(A, sx, sy, sz, PsiPsi, epsilon=1e-10,
-                  iter_max=40, display=True):
+                  iter_max=100, display=True,
+                  checkStep=20):
     """find sx, sy, sz that maximize FET fidelity
 
     Args:
@@ -78,11 +79,10 @@ def optimize_alls(A, sx, sy, sz, PsiPsi, epsilon=1e-10,
             # record FET error
             errList.append(err)
             # check the change of FET error
-            checkStep = 5
-            if display and (k % checkStep == 0 or k == iter_max - 1):
-                print("Iteration {:d}.".format(k+1),
-                      "FET Error is {:.3e} (leg {:s})".format(err, leg)
-                      )
+            if (k % checkStep == 0 or k == iter_max - 1):
+                # if the FET error is small,
+                # the optimization for the leg is done
+                doneLegs[leg] = (abs(errList[-1]) < epsilon)
                 # if the change of FET error is small,
                 # the optimization for the leg is done
                 if k > 0:
@@ -90,7 +90,13 @@ def optimize_alls(A, sx, sy, sz, PsiPsi, epsilon=1e-10,
                         abs((errList[-1] - errList[-1 - 3 * checkStep]) / (
                             errList[-1 - 3 * checkStep] + 1e-8)
                             ) < (0.01 * 3 * checkStep / 100)
+                        or doneLegs[leg]
                     )
+                # print out the change of FET error if needed
+                if display:
+                    print("Iteration {:d}.".format(k+1),
+                          "FET Error is {:.3e} (leg {:s})".format(err, leg)
+                          )
         if all(doneLegs.values()):
             break
 
