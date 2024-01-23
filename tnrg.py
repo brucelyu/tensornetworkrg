@@ -985,7 +985,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
 
         if display:
             print("====================")
-            print("Start {:d} RG step...".format(self.iter_n))
+            print("Start {:d} RG step...".format(self.iter_n+1))
         # -----~~~>> Entanglement Filtering
         # (E.1) cube-filtering on input tensor `A`
         # Approximate 8-copies of `A` forming a cube
@@ -1004,9 +1004,12 @@ class TensorNetworkRG3D(TensorNetworkRG):
                 Lrx, Lry, Lrz, Gammay
             ) = fet3d.init_alls(Aout, chis, chienv, epsilonCube)
             if display:
-                print("Shape of initial sx is {}.".format(sx.shape))
-                print("Shape of initial sy is {}.".format(sy.shape))
-                print("Shape of initial sz is {}.".format(sz.shape))
+                print("Shape of initial sx is {}".format(sx.shape),
+                      "(Qhape is {}).".format(sx.qhape))
+                print("Shape of initial sy is {}".format(sy.shape),
+                      "(Qhape is {}).".format(sy.qhape))
+                print("Shape of initial sz is {}".format(sz.shape),
+                      "(Qhape is {}).".format(sz.qhape))
 
             # (E.1)S2: Optimize sx, sy, sz matrices using FET
             # - Compute <ψ|ψ> for calculating initialization fidelity
@@ -1018,7 +1021,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
                 sx, sy, sz, cubeErrList
              ) = fet3dcube.optimize_alls(
                  Aout, sx, sy, sz, PsiPsiCube, epsilon=cg_eps,
-                 iter_max=200, display=display
+                 iter_max=100, display=display,
+                 checkStep=20
              )
             # - FET fidelity after optimization of s matrices
             (err1Cube, PhiPhi1) = fet3dcube.fidelity(
@@ -1027,7 +1031,10 @@ class TensorNetworkRG3D(TensorNetworkRG):
                 print("  Initial FET error for insertion of",
                       "s matrices is {:.3e}".format(err0Cube))
                 print("    Final FET error for insertion of",
-                      "s matrices is {:.3e}".format(err1Cube))
+                      "s matrices is {:.3e}".format(err1Cube),
+                      "({:d} iterations each leg)".format(
+                          int(len(cubeErrList)/3)
+                      ))
 
             # (E.1)S3: Absorb sx, sy, sz into the initial tensor A
             # - Take care the overall magnitude of sx, sy, sz to
@@ -1080,8 +1087,10 @@ class TensorNetworkRG3D(TensorNetworkRG):
                 mLrx, mLry, GammaLPZy
             ) = fet3dloop.init_zloopm(Aout, chiMs, chiMenv, epsilonM)
             if display:
-                print("Shape of initial mx is {}.".format(mx.shape))
-                print("Shape of initial my is {}.".format(my.shape))
+                print("Shape of initial mx is {}.".format(mx.shape),
+                      "(Qhape is {}).".format(mx.qhape))
+                print("Shape of initial my is {}.".format(my.shape),
+                      "(Qhape is {}).".format(mx.qhape))
 
             # (E.2.1)S2: Optimize mx, my matrices using FET
             # - Compute <ψ|ψ> for calculating initialization fidelity
@@ -1093,7 +1102,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
                 mx, my, ErrListLPZ
             ) = fet3dloop.optimize_zloop(
                 Aout, mx, my, PsiPsiLPZ, epsilon=cg_eps,
-                iter_max=100, checkStep=20
+                iter_max=100, checkStep=20, display=display
             )
             # - FET fidelity after optimization of mx, my matrices
             (err1LPZ, PhiPhiLPZ) = fet3dloop.fidelityLPZ(
@@ -1102,7 +1111,10 @@ class TensorNetworkRG3D(TensorNetworkRG):
                 print("  Initial FET error for insertion of",
                       "mx, my matrices is {:.3e}".format(err0LPZ))
                 print("    Final FET error for insertion of",
-                      "mx, my matrices is {:.3e}".format(err1LPZ))
+                      "mx, my matrices is {:.3e}".format(err1LPZ),
+                      "({:d} iterations each leg)".format(
+                          int(len(ErrListLPZ)/2)
+                      ))
 
             # (E.2.1)S3: Absorb mx, my into the tensor Az
             # - Take care the overall magnitude of mx, my to
@@ -1150,7 +1162,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
                 mz, mLrz, GammaLPYz
             ) = fet3dloop.init_yloopm(Aout, chiMs, chiMenv, epsilonM)
             if display:
-                print("Shape of initial mz is {}.".format(mz.shape))
+                print("Shape of initial mz is {}.".format(mz.shape),
+                      "(Qhape is {}).".format(mz.qhape))
 
             # (E.2.2)S2: Optimize mz matrix using FET
             # - Compute <ψ|ψ> for calculating initialization fidelity
@@ -1162,7 +1175,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
                 mz, ErrListLPY
             ) = fet3dloop.optimize_yloop(
                 Aout, mz, PsiPsiLPY, epsilon=cg_eps,
-                iter_max=100, checkStep=20
+                iter_max=100, checkStep=20, display=display
             )
             # - FET fidelity after optimization of mz matrix
             (err1LPY, PhiPhiLPY) = fet3dloop.fidelityLPY(
@@ -1171,7 +1184,10 @@ class TensorNetworkRG3D(TensorNetworkRG):
                 print("  Initial FET error for insertion of",
                       "mz matrices is {:.3e}".format(err0LPY))
                 print("    Final FET error for insertion of",
-                      "mz matrices is {:.3e}".format(err1LPY))
+                      "mz matrices is {:.3e}".format(err1LPY),
+                      "({:d} iterations each leg)".format(
+                          len(ErrListLPY)
+                      ))
 
             # (E.2.2)S3: Absorb mz into the tensor Azy
             # - Take care the overall magnitude of mz to
@@ -1185,6 +1201,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
             # (+)-position tensor Azy
             # so the two legs are squeezed due to filtering
             Aout = fet3dloop.absb_mloopy(Aout, mz)
+            if display:
+                print("  <<~~~~~~~~~~<<")
         else:
             mz = 1
             err0LPY, err1LPY = [0 for k in range(2)]
@@ -1202,6 +1220,38 @@ class TensorNetworkRG3D(TensorNetworkRG):
             Aout, poy.conj(), poz.conj(), poy, poz
         )
         # -----/
+
+        # print summary of block-tensor RG errors
+        if display:
+            print("Brief summary of block-tensor RG errors...")
+            print("I. Outmost errors: (χ = {:d})".format(chi))
+            print("x = {:.2e}, y = {:.2e}, z = {:.2e}".format(
+                      yerrs[1], xerrs[0], xerrs[1]
+                  ))
+            print("II. Intermediate errors: (χm = {:d})".format(chiM))
+            print("   Actually χmx = {} ({}), χmy = {} ({}),".format(
+                pmx.shape[2], pmx.qhape[2],
+                pmy.shape[2], pmy.qhape[2]
+            ), "χmz = {} ({})".format(
+                pmz.shape[2], pmz.qhape[2]
+            ))
+            print("x = {:.2e}, y = {:.2e}, z = {:.2e}".format(
+                      zerrs[0], zerrs[2], yerrs[0]
+                  ))
+            print("III. Inner-cube errors:",
+                  "(χi = {:d}, χii = {:d})".format(chiI, chiII))
+            print("   Actually χix = {} ({}), χiy = {} ({}),".format(
+                pix.shape[2], pix.qhape[2],
+                piy.shape[2], piy.qhape[2]
+            ), "χiix = {} ({})".format(
+                 piix.shape[2], piix.qhape[2]
+            ))
+            print("xin = {:.2e}, yin = {:.2e}, xinin = {:.2e}".format(
+                      zerrs[1], zerrs[3], yerrs[2]
+                  ))
+            print("x-direction RG spectrum is")
+            xarr = -np.sort(-yds[1].to_ndarray())
+            print(xarr/xarr[0])
 
         # update the isometric tensors for block-tensor RG
         self.isometry_applied = [
