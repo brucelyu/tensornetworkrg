@@ -1275,12 +1275,13 @@ class TensorNetworkRG3D(TensorNetworkRG):
         rgerr = [zerrs, yerrs, xerrs]
         return lrerr, rgerr
 
-
     def rgmap(self, tnrg_pars,
               scheme="hotrg3d", ver="base",
               gaugeFix=False,
               comm=None,
-              chiSet=None):
+              chiSet=None,
+              cubeFilter=True,
+              loopFilter=True,):
         """
         coarse grain the tensors using schemes above
         - hotrg3d
@@ -1311,6 +1312,13 @@ class TensorNetworkRG3D(TensorNetworkRG):
                                           signFix=gaugeFix,
                                           comm=comm,
                                           chiSet=chiSet)
+            elif ver == "bistage":
+                (lferrs,
+                 SPerrs
+                 ) = self.ef2stp_blockrg(
+                     tnrg_pars,
+                     cubeFilter=cubeFilter, loopFilter=loopFilter,
+                     signFix=gaugeFix)
         return lferrs, SPerrs
 
     # II. linearized RG maps
