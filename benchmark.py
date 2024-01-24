@@ -266,10 +266,6 @@ def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
                  data=Aorg
                  )
 
-    if scheme == "efrg":
-        chiSave = tnrg_pars["chi"]
-        chisSave = tnrg_pars["chis"]
-        chienvSave = tnrg_pars["chienv"]
     for k in range(rg_n):
         # Whether to specfiy the outer bond dimension between
         # spin-flip Z2 charge sectors
@@ -280,31 +276,35 @@ def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
         # For 3D Ising class, the first RG step only truncate
         # the bond dimension to 6 for χ=7,8,9, due to
         # the intrinsic property of the initial tensor.
-        # Therefore, for k=0,1, we always use the χ=6 parameter
-        # for χ=7,8,9
-        if (scheme == "efrg") and (chiSave in [7, 8, 9]):
-            if k == 0:
-                # first RG always set χ=6
-                tnrg_pars["chi"] = 6
-            elif k == 1:
-                # set χ back
-                tnrg_pars["chi"] = chiSave
-                # set χs and χenv to be 4 and 16
-                tnrg_pars["chis"] = 4
-                tnrg_pars["chienv"] = 16
-            else:
-                # set χs and χenv back
-                tnrg_pars["chis"] = chisSave
-                tnrg_pars["chienv"] = chienvSave
+        if k == 0:
+            # For the first RG step from χ: 2 --> 4 --> 16,
+            # we always use the basic block-tensor RG
+            # and fix the output χ=10
+            pars_0rg = tnrg_pars.copy()
+            if tnrg_pars["chi"] in [7, 8, 9]:
+                pars_0rg["chi"] = 10
+                pars_0rg["chiM"] = 10
+                pars_0rg["chiI"] = 10
+                pars_0rg["chiII"] = 16
+            (
+             lrerrs,
+             SPerrs
+             ) = tnrg3dCase.rgmap(
+                 pars_0rg,
+                 scheme="blockHOTRG", ver="base",
+                 comm=comm)
+        else:
+            # Starting from the second RG step
+            # we use the specified TNRG scheme
+            (
+             lrerrs,
+             SPerrs
+             ) = tnrg3dCase.rgmap(tnrg_pars,
+                                  scheme=scheme, ver=ver,
+                                  gaugeFix=gaugeFix,
+                                  comm=comm,
+                                  chiSet=doChiSet)
 
-        (
-         lrerrs,
-         SPerrs
-         ) = tnrg3dCase.rgmap(tnrg_pars,
-                              scheme=scheme, ver=ver,
-                              gaugeFix=gaugeFix,
-                              comm=comm,
-                              chiSet=doChiSet)
         # save updated tesnor at rank-0 process
         if (dataDir is not None) and (rank == 0):
             fname = "A{:02d}.pkl".format(k + 1)
@@ -352,8 +352,9 @@ def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
             print("The RG step {:d} finished!".format(
                 tnrg3dCase.get_iteration())
                   )
-            print("Shape of the tensor is")
-            print(tnrg3dCase.get_tensor().shape)
+            print("Shape (Qhape) of the tensor is")
+            print(" {} ".format(tnrg3dCase.get_tensor().shape))
+            print("({})".format(tnrg3dCase.get_tensor().qhape))
             print("Degnerate index X = {:.2f}".format(curX))
             print("Entanglement entropies:")
             print("Leg x: {:.2f}, Leg y: {:.2f}, Leg z: {:.2f}".format(
