@@ -705,10 +705,16 @@ def saveDirName(scheme, ver, pars, outDir="./",
                )
     # for EFRG
     if scheme == "efrg":
+        if ver == "base":
+            paraDir = "chi{:02d}s{:d}M{:d}".format(
+                pars["chi"], pars["chis"], pars["chiM"]
+            )
+        elif ver == "bistage":
+            paraDir = "chi{:02d}s{:d}M{:d}s{:d}".format(
+                pars["chi"], pars["chis"], pars["chiM"], pars["chiMs"]
+            )
         saveDir = (outDir + "{:s}_{:s}_{:s}".format(scheme, ver, endword) +
-                   "/" +
-                   "chi{:02d}s{:d}M{:d}".format(
-                       pars["chi"], pars["chis"], pars["chiM"])
+                   "/" + paraDir
                    )
     return saveDir
 
