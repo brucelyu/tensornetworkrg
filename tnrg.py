@@ -20,6 +20,8 @@ from .loop_filter import (
     cleanLoop, toymodels, fet3d, env3d, fet3dcube, fet3dloop
 )
 from . import u1ten
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 
 class TensorNetworkRG:
@@ -999,11 +1001,20 @@ class TensorNetworkRG3D(TensorNetworkRG):
             chienv = pars["chienv"]
             epsilonCube = pars["epsilon"]
             # (E.1)S1: Initialize sx, sy, sz matrices (a GILT-like method)
+            if display:
+                timing0 = datetime.now()
             (
                 sx, sy, sz,
                 Lrx, Lry, Lrz, Gammay
             ) = fet3d.init_alls(Aout, chis, chienv, epsilonCube)
             if display:
+                timing1 = datetime.now()
+                diffT = relativedelta(timing1, timing0)
+                print("--> Cube-filter initialization takes",
+                      "{} minutes {:.3f} seconds <--".format(
+                          diffT.minutes,
+                          diffT.seconds + diffT.microseconds*1e-6
+                      ))
                 print("Shape of initial sx is {}".format(sx.shape),
                       "(Qhape is {}).".format(sx.qhape))
                 print("Shape of initial sy is {}".format(sy.shape),
@@ -1017,6 +1028,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
             # - FET fidelity of inserting initial s matrices
             err0Cube = fet3dcube.fidelity(Aout, sx, sy, sz, PsiPsiCube)[1]
             # - Optimization of sx, sy, sz matrices
+            if display:
+                timing0 = datetime.now()
             (
                 sx, sy, sz, cubeErrList
              ) = fet3dcube.optimize_alls(
@@ -1028,6 +1041,19 @@ class TensorNetworkRG3D(TensorNetworkRG):
             (err1Cube, PhiPhi1) = fet3dcube.fidelity(
                 Aout, sx, sy, sz, PsiPsiCube)[1:]
             if display:
+                timing1 = datetime.now()
+                diffT = relativedelta(timing1, timing0)
+                print("--> Each cube-FET iteration takes",
+                      "{:.3f} seconds <--".format(
+                          (diffT.minutes*60 +
+                           diffT.seconds +
+                           diffT.microseconds*1e-6) / len(cubeErrList)
+                      ))
+                print("--> Total wall time is",
+                      "{} minutes {:.3f} seconds <--".format(
+                          diffT.minutes,
+                          diffT.seconds + diffT.microseconds*1e-6
+                      ))
                 print("  Initial FET error for insertion of",
                       "s matrices is {:.3e}".format(err0Cube))
                 print("    Final FET error for insertion of",
@@ -1057,6 +1083,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
         # -----~~~<<
 
         # -----\
+        if display:
+            timing0 = datetime.now()
         # (C.1) z-direction coarse graining
         # (C.1)S1: Determine 2-to-1 isometric tensors
         zpjs, zerrs, zds = bkten3d.zfindp(
@@ -1067,6 +1095,16 @@ class TensorNetworkRG3D(TensorNetworkRG):
         Aout = bkten3d.zblock(
             Aout, pmx.conj(), pmy.conj(), pix, piy
         )
+        if display:
+            timing1 = datetime.now()
+            diffT = relativedelta(timing1, timing0)
+            print()
+            print("--> z-direction(1) HOTRG takes",
+                  "{} minutes {:.3f} seconds <--".format(
+                      diffT.minutes,
+                      diffT.seconds + diffT.microseconds*1e-6
+                  ))
+            print()
         # -----/
 
         # -----~~~>>
@@ -1082,11 +1120,20 @@ class TensorNetworkRG3D(TensorNetworkRG):
             chiMenv = pars["chiMenv"]
             epsilonM = pars["epsilonM"]
             # (E.2.1)S1: Initialize mx, my matrices (a GILT-like method)
+            if display:
+                timing0 = datetime.now()
             (
                 mx, my,
                 mLrx, mLry, GammaLPZy
             ) = fet3dloop.init_zloopm(Aout, chiMs, chiMenv, epsilonM)
             if display:
+                timing1 = datetime.now()
+                diffT = relativedelta(timing1, timing0)
+                print("--> Z-Loop-filter initialization takes",
+                      "{} minutes {:.3f} seconds <--".format(
+                          diffT.minutes,
+                          diffT.seconds + diffT.microseconds*1e-6
+                      ))
                 print("Shape of initial mx is {}.".format(mx.shape),
                       "(Qhape is {}).".format(mx.qhape))
                 print("Shape of initial my is {}.".format(my.shape),
@@ -1098,6 +1145,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
             # - FET fidelity of inserting initial s matrices
             err0LPZ = fet3dloop.fidelityLPZ(Aout, mx, my, PsiPsiLPZ)[1]
             # - Optimization of mx, my matrices
+            if display:
+                timing0 = datetime.now()
             (
                 mx, my, ErrListLPZ
             ) = fet3dloop.optimize_zloop(
@@ -1108,6 +1157,19 @@ class TensorNetworkRG3D(TensorNetworkRG):
             (err1LPZ, PhiPhiLPZ) = fet3dloop.fidelityLPZ(
                 Aout, mx, my, PsiPsiLPZ)[1:]
             if display:
+                timing1 = datetime.now()
+                diffT = relativedelta(timing1, timing0)
+                print("--> Each Z-Loop-FET iteration takes",
+                      "{:.3f} seconds <--".format(
+                          (diffT.minutes*60 +
+                           diffT.seconds +
+                           diffT.microseconds*1e-6) / len(ErrListLPZ)
+                      ))
+                print("--> Total wall time is",
+                      "{} minutes {:.3f} seconds <--".format(
+                          diffT.minutes,
+                          diffT.seconds + diffT.microseconds*1e-6
+                      ))
                 print("  Initial FET error for insertion of",
                       "mx, my matrices is {:.3e}".format(err0LPZ))
                 print("    Final FET error for insertion of",
@@ -1137,6 +1199,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
         # -----~~~<<
 
         # -----\
+        if display:
+            timing0 = datetime.now()
         # (C.2) y-direction coarse graining
         # (C.2) Step 1: Determine 2-to-1 isometric tensors
         ypjs, yerrs, yds = bkten3d.yfindp(
@@ -1147,6 +1211,16 @@ class TensorNetworkRG3D(TensorNetworkRG):
         Aout = bkten3d.yblock(
             Aout, pmz.conj(), pox.conj(), pmz, piix
         )
+        if display:
+            timing1 = datetime.now()
+            diffT = relativedelta(timing1, timing0)
+            print()
+            print("--> y-direction(2) HOTRG takes",
+                  "{} minutes {:.3f} seconds <--".format(
+                      diffT.minutes,
+                      diffT.seconds + diffT.microseconds*1e-6
+                  ))
+            print()
         # -----/
 
         # -----~~~>>
@@ -1157,11 +1231,19 @@ class TensorNetworkRG3D(TensorNetworkRG):
         if loopFilter:
             if display:
                 print("  >>~~~~Y-Loop-Filter~~~~~~>>")
+                timing0 = datetime.now()
             # (E.2.2)S1: Initialize mz matrix (a GILT-like method)
             (
                 mz, mLrz, GammaLPYz
             ) = fet3dloop.init_yloopm(Aout, chiMs, chiMenv, epsilonM)
             if display:
+                timing1 = datetime.now()
+                diffT = relativedelta(timing1, timing0)
+                print("--> Y-Loop-filter initialization takes",
+                      "{} minutes {:.3f} seconds <--".format(
+                          diffT.minutes,
+                          diffT.seconds + diffT.microseconds*1e-6
+                      ))
                 print("Shape of initial mz is {}.".format(mz.shape),
                       "(Qhape is {}).".format(mz.qhape))
 
@@ -1171,6 +1253,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
             # - FET fidelity of inserting initial mz matrix
             err0LPY = fet3dloop.fidelityLPY(Aout, mz, PsiPsiLPY)[1]
             # - Optimization of mz matrix
+            if display:
+                timing0 = datetime.now()
             (
                 mz, ErrListLPY
             ) = fet3dloop.optimize_yloop(
@@ -1181,6 +1265,19 @@ class TensorNetworkRG3D(TensorNetworkRG):
             (err1LPY, PhiPhiLPY) = fet3dloop.fidelityLPY(
                 Aout, mz, PsiPsiLPY)[1:]
             if display:
+                timing1 = datetime.now()
+                diffT = relativedelta(timing1, timing0)
+                print("--> Each Y-Loop-FET iteration takes",
+                      "{:.3f} seconds <--".format(
+                          (diffT.minutes +
+                           diffT.seconds +
+                           diffT.microseconds*1e-6) / len(ErrListLPY)
+                      ))
+                print("--> Total wall time is",
+                      "{} minutes {:.3f} seconds <--".format(
+                          diffT.minutes,
+                          diffT.seconds + diffT.microseconds*1e-6
+                      ))
                 print("  Initial FET error for insertion of",
                       "mz matrices is {:.3e}".format(err0LPY))
                 print("    Final FET error for insertion of",
@@ -1209,6 +1306,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
         # -----~~~<<
 
         # -----\
+        if display:
+            timing0 = datetime.now()
         # (C.3) x-direction coarse graining
         # (C.3) Step 1: Determine 2-to-1 isometric tensors
         xpjs, xerrs, xds = bkten3d.xfindp(
@@ -1219,6 +1318,16 @@ class TensorNetworkRG3D(TensorNetworkRG):
         Aout = bkten3d.xblock(
             Aout, poy.conj(), poz.conj(), poy, poz
         )
+        if display:
+            timing1 = datetime.now()
+            diffT = relativedelta(timing1, timing0)
+            print()
+            print("--> x-direction(3) HOTRG takes",
+                  "{} minutes {:.3f} seconds <--".format(
+                      diffT.minutes,
+                      diffT.seconds + diffT.microseconds*1e-6
+                  ))
+            print()
         # -----/
 
         # print summary of block-tensor RG errors
@@ -1252,6 +1361,14 @@ class TensorNetworkRG3D(TensorNetworkRG):
             print("x-direction RG spectrum is")
             xarr = -np.sort(-yds[1].to_ndarray())
             print(xarr/xarr[0])
+
+        # (Gauge) Sign fixing:
+        if signFix:
+            (
+                Aout, pox, poy, poz
+            ) = bkten3d.signFix(Aout, Aold,
+                                pox, poy, poz,
+                                verbose=display)
 
         # update the isometric tensors for block-tensor RG
         self.isometry_applied = [
