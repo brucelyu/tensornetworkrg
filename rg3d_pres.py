@@ -198,11 +198,18 @@ def generateRGflow(scheme="hotrg3d", ver="base",
 
         if scheme == "efrg":
             # plot flow of RG errors
-            errFigFile = saveDir + "/errs_s{:d}M{:d}.png".format(
-                pars["chis"], pars["chiM"]
-            )
-            plotefrg(pars["chi"], lrerrsFlow, SPerrsFlow,
-                     0, plotRGmax, errFigFile)
+            if ver == "base":
+                errFigFile = saveDir + "/errs_s{:d}M{:d}.png".format(
+                    pars["chis"], pars["chiM"]
+                )
+                plotefrg(pars["chi"], lrerrsFlow, SPerrsFlow,
+                         0, plotRGmax, errFigFile)
+            elif ver == "bistage":
+                errFigFile = saveDir + "/errs_s{:d}M{:d}s{:d}.png".format(
+                    pars["chis"], pars["chiM"], pars["chiMs"]
+                )
+                plot2stgEFRG(pars["chi"], lrerrsFlow, SPerrsFlow,
+                             0, plotRGmax, errFigFile)
 
 
 # linearize RG map and extracting scaling dimensions
@@ -848,5 +855,54 @@ def plotefrg(chi, lrerrsList, SPerrsList,
     plt.yscale("log")
     plt.ylim([1e-4, 1e-1])
     plt.legend()
+    plt.savefig(figFile, bbox_inches='tight',
+                dpi=300)
+
+
+def plot2stgEFRG(chi, lrerrsList, SPerrsList,
+                 startn, endn, figFile):
+    # process lrerrsList and SPerrsList
+    SPplot = [[rgerr[1][1], rgerr[2][0], rgerr[2][1],
+               rgerr[0][0], rgerr[0][2], rgerr[1][0]] for rgerr in SPerrsList]
+    SPplot = np.array(SPplot)
+    lrerrsList[0] = [[0, 0], [0, 0], [0, 0]]
+    lrerr = np.array(lrerrsList)
+    fig, axs = plt.subplots(4, 1, figsize=(10, 8),
+                            gridspec_kw={'height_ratios': [3, 1, 1, 1]})
+    ax1 = axs[0]
+    ax1.plot(SPplot[startn:endn, 0], "r+-", alpha=0.4, label="Outmost x")
+    ax1.plot(SPplot[startn:endn, 1], "yx-", alpha=0.4, label="Outmost y")
+    ax1.plot(SPplot[startn:endn, 2], "y+-", alpha=0.4, label="Outmost z")
+    ax1.plot(SPplot[startn:endn, 3], "bx-", alpha=0.4, label="Intermed x")
+    ax1.plot(SPplot[startn:endn, 4], "b+-", alpha=0.4, label="Intermed y")
+    ax1.plot(SPplot[startn:endn, 5], "rx-", alpha=0.4, label="Intermed z")
+    ax1.set_ylabel("RG errors")
+    ax1.set_yscale("log")
+    ax1.set_title(r"$\chi = ${:d} (bistage-FET + block-tensor)".format(chi))
+    ax1.legend()
+    ax2 = axs[1]
+    ax2.plot(lrerr[startn:endn, 0, 0], "g.--", alpha=0.4,
+             label="cube (Initial)")
+    ax2.plot(lrerr[startn:endn, 0, 1], "k.--", alpha=0.4,
+             label="cube (Optimized)")
+    ax2.set_ylabel("FET errors")
+    ax2.set_yscale("log")
+    ax2.legend()
+    ax3 = axs[2]
+    ax3.plot(lrerr[startn:endn, 1, 0], "g.--", alpha=0.4,
+             label="Z-loop (Initial)")
+    ax3.plot(lrerr[startn:endn, 1, 1], "k.--", alpha=0.4,
+             label="Z-loop (Optimized)")
+    ax3.set_ylabel("FET errors")
+    ax3.set_yscale("log")
+    ax3.legend()
+    ax4 = axs[3]
+    ax4.plot(lrerr[startn:endn, 2, 0], "g.--", alpha=0.4,
+             label="Y-loop (Initial)")
+    ax4.plot(lrerr[startn:endn, 2, 1], "k.--", alpha=0.4,
+             label="Y-loop (Optimized)")
+    ax4.set_ylabel("FET errors")
+    ax4.set_yscale("log")
+    ax4.legend()
     plt.savefig(figFile, bbox_inches='tight',
                 dpi=300)
