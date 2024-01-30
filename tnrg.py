@@ -1491,16 +1491,20 @@ class TensorNetworkRG3D(TensorNetworkRG):
         return linearRGSet, dims_PsiA
 
     @staticmethod
-    def linear_block_hotrg(Astar, cgten, refl_c=[0, 0, 0],
-                           comm=None,
-                           isEF=False):
+    def linear_block_hotrg(
+        Astar, cgten, refl_c=[0, 0, 0], comm=None, isEF=False,
+        ver="base", cubeFilter=True, loopFilter=True
+    ):
         # I. generate all the middle tensors during a RG step
         if not isEF:
             # Case 1: 3D hotrg-like block-tensor
             Astar_all = bkten3d.fullContr(Astar, cgten, comm=comm)
         else:
             # Case 2: add entanglement filtering
-            Astar_all = efrg3d.fullContr(Astar, cgten, comm=comm)
+            Astar_all = efrg3d.fullContr(
+                Astar, cgten, comm=comm,
+                ver=ver, cubeFilter=cubeFilter, loopFilter=loopFilter
+            )
 
         # II. construct linearized RG for both sectors
         # II.1 For Spin-flip charge-0 (Even) sector
@@ -1524,7 +1528,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
                 # Case 2: add entanglement filtering
                 deltaAcch0 = efrg3d.linrgmap(
                     deltaAch0, Astar_all, cgten,
-                    refl_c, comm=comm
+                    refl_c, comm=comm,
+                    ver=ver, cubeFilter=cubeFilter, loopFilter=loopFilter
                 )
             # ------------------------------------/
             # reshape the output deltaAcch0 back into a 1D array
@@ -1555,7 +1560,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
                 # Case 2: add entanglement filtering
                 deltaAcch1 = efrg3d.linrgmap(
                     deltaAch1, Astar_all, cgten,
-                    refl_c, comm=comm
+                    refl_c, comm=comm,
+                    ver=ver, cubeFilter=cubeFilter, loopFilter=loopFilter
                 )
             # ------------------------------------/
             # reshape the output deltaAcch1 back into a 1D array

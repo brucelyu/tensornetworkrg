@@ -287,7 +287,10 @@ def linRG2scaleD(scheme="hotrg3d", ver="base", pars={},
             elif scheme == "blockHOTRG":
                 AoutCheck = bkten3d.fullContr(Acur, isom[k], comm=comm)[-1]
             elif scheme == "efrg":
-                AoutCheck = efrg3d.fullContr(Acur, isom[k], comm=comm)[-1]
+                AoutCheck = efrg3d.fullContr(
+                    Acur, isom[k], comm=comm,
+                    ver=ver, cubeFilter=True, loopFilter=True
+                )[-1]
             AoutCheck = AoutCheck / AoutCheck.norm()
             checkDiff = (AoutCheck - Anxt).norm()
             errMsg = ("isometries have wrong gauge!" +
@@ -312,36 +315,43 @@ def linRG2scaleD(scheme="hotrg3d", ver="base", pars={},
             scDList.append(scDims)
         elif scheme in ["blockHOTRG", "efrg"]:
             scDims000, idenEig = linRG2x(
-                Astar, isom[k], scheme=scheme, ver="base",
+                Astar, isom[k], scheme=scheme,
+                ver=ver, cubeFilter=True, loopFilter=True,
                 nscaleD=[7, 5], comm=comm, refl_c=[0, 0, 0]
             )
             scDims100 = linRG2x(
-                Astar, isom[k], scheme=scheme, ver="base",
+                Astar, isom[k], scheme=scheme,
+                ver=ver, cubeFilter=True, loopFilter=True,
                 nscaleD=[3, 4], comm=comm, refl_c=[1, 0, 0],
                 sector=[None, idenEig]
             )
             scDims010 = linRG2x(
-                Astar, isom[k], scheme=scheme, ver="base",
+                Astar, isom[k], scheme=scheme,
+                ver=ver, cubeFilter=True, loopFilter=True,
                 nscaleD=[3, 4], comm=comm, refl_c=[0, 1, 0],
                 sector=[None, idenEig]
             )
             scDims001 = linRG2x(
-                Astar, isom[k], scheme=scheme, ver="base",
+                Astar, isom[k], scheme=scheme,
+                ver=ver, cubeFilter=True, loopFilter=True,
                 nscaleD=[3, 4], comm=comm, refl_c=[0, 0, 1],
                 sector=[None, idenEig]
             )
             scDims110 = linRG2x(
-                Astar, isom[k], scheme=scheme, ver="base",
+                Astar, isom[k], scheme=scheme,
+                ver=ver, cubeFilter=True, loopFilter=True,
                 nscaleD=[2, 2], comm=comm, refl_c=[1, 1, 0],
                 sector=[None, idenEig]
             )
             scDims101 = linRG2x(
-                Astar, isom[k], scheme=scheme, ver="base",
+                Astar, isom[k], scheme=scheme,
+                ver=ver, cubeFilter=True, loopFilter=True,
                 nscaleD=[2, 2], comm=comm, refl_c=[1, 0, 1],
                 sector=[None, idenEig]
             )
             scDims011 = linRG2x(
-                Astar, isom[k], scheme=scheme, ver="base",
+                Astar, isom[k], scheme=scheme,
+                ver=ver, cubeFilter=True, loopFilter=True,
                 nscaleD=[2, 2], comm=comm, refl_c=[0, 1, 1],
                 sector=[None, idenEig]
             )
@@ -618,6 +628,7 @@ def linRG2scaleD1rg(scheme="hotrg3d", ver="base", pars={},
 
 
 def linRG2x(Astar, cgtens, scheme="hotrg3d", ver="base",
+            cubeFilter=True, loopFilter=True,
             nscaleD=[10, 10], comm=None, sector=[None, None],
             refl_c=[0, 0, 0]):
     """scaling dimensions from linearized RG equation
@@ -644,7 +655,8 @@ def linRG2x(Astar, cgtens, scheme="hotrg3d", ver="base",
         )
     elif scheme == "efrg":
         linearRGSet, dims_PsiA = ising3d.linear_block_hotrg(
-            Astar, cgtens, refl_c, comm=comm, isEF=True
+            Astar, cgtens, refl_c, comm=comm, isEF=True,
+            ver=ver, cubeFilter=cubeFilter, loopFilter=loopFilter
         )
 
     if sector[0] is None:
