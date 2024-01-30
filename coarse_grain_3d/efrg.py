@@ -8,37 +8,62 @@
 """
 Functions for linearzation of entanglement-free RG (efrg)
 """
-from ..loop_filter import fet3d
+from ..loop_filter import fet3d, fet3dloop
 from . import block_tensor as bkten3d
 
 
-def fullContr(A, cg_tens, comm=None):
+def fullContr(A, cg_tens, comm=None,
+              ver="base",
+              cubeFilter=True,
+              loopFilter=True):
     """
     Basically the same as the `.block_tensor.fullContr`
     See the documentation there
     """
-    [
-        pox, poy, poz, pmx, pmy, pmz, pix, piy, piix,
-        sx, sy, sz
-    ] = cg_tens
-    # I. Absorbing entanglement-filtering matrices
+    if ver == "base":
+        [
+            pox, poy, poz, pmx, pmy, pmz, pix, piy, piix,
+            sx, sy, sz
+        ] = cg_tens
+    elif ver == "bistage":
+        [
+            pox, poy, poz, pmx, pmy, pmz, pix, piy, piix,
+            sx, sy, sz, mx, my, mz
+        ] = cg_tens
+    # (E.1) Absorbing cube-filtering matrices
     # into the main tensor A, such that
     # the 3 outer legs of A is squeezed
-    As = fet3d.absbs(A, sx, sy, sz)
+    if (ver == "base") or (ver == "bistage" and cubeFilter):
+        As = fet3d.absbs(A, sx, sy, sz)
+    else:
+        As = A * 1.0
 
-    # II. Apply the hotrg-like block-tensor RG
+    # (C). Apply the hotrg-like block-tensor RG
     # (
     #    As, Asz, Aszy, Aszyx
     # ) = bkten3d.fullContr(As, cg_tens[:-3], comm)
 
     # (Below the same as `bkten3d.fullContr`)
     # ------------------------------\
+    # (C.1) z-direction collapse
     Asz = bkten3d.zblock(
         As, pmx.conj(), pmy.conj(), pix, piy
     )
+    # (E.2.1) Absorbing loop-filtering matrices
+    # into x and y legs of z-collapsed tensor `Az`
+    if ver == "bistage" and loopFilter:
+        Asz = fet3dloop.absb_mloopz(Asz, mx, my)
+
+    # (C.2) y-direction collapse
     Aszy = bkten3d.yblock(
         Asz, pmz.conj(), pox.conj(), pmz, piix
     )
+    # (E.2.2) Absorbing loop-filtering matrices
+    # into z legs of y-collapsed tensor `Azy`
+    if ver == "bistage" and loopFilter:
+        Aszy = fet3dloop.absb_mloopy(Aszy, mz)
+
+    # (C.3) x-direction collapse
     Aszyx = bkten3d.xblock(
         Aszy, poy.conj(), poz.conj(), poy, poz
     )
@@ -47,23 +72,36 @@ def fullContr(A, cg_tens, comm=None):
 
 
 def linrgmap(dA, Astar_all, cg_tens,
-             refl_c=[0, 0, 0], comm=None):
+             refl_c=[0, 0, 0], comm=None,
+             ver="base",
+             cubeFilter=True,
+             loopFilter=True):
     """
     Basically the same as the `.block_tensor.linrgmap`
     See the documentation there
     """
-    [
-        pox, poy, poz, pmx, pmy, pmz, pix, piy, piix,
-        sx, sy, sz
-    ] = cg_tens
+    if ver == "base":
+        [
+            pox, poy, poz, pmx, pmy, pmz, pix, piy, piix,
+            sx, sy, sz
+        ] = cg_tens
+    elif ver == "bistage":
+        [
+            pox, poy, poz, pmx, pmy, pmz, pix, piy, piix,
+            sx, sy, sz, mx, my, mz
+        ] = cg_tens
+
     [A, As, Asz, Aszy, Aszyx] = Astar_all
     cX, cY, cZ = refl_c
     c2sign = {0: 1, 1: -1}
 
-    # 0. entanglement-filtering matrices linearization
-    dAs = fet3d.absbs(dA, sx, sy, sz)
+    # (E.1) cube-filtering matrices linearization
+    if (ver == "base") or (ver == "bistage" and cubeFilter):
+        dAs = fet3d.absbs(dA, sx, sy, sz)
+    else:
+        dAs = dA * 1.0
 
-    # 1. Call the linearization of block-tensor RG
+    # (C) Call the linearization of block-tensor RG
     # ------------------------------\
     # dAc = bkten3d.linrgmap(
     #     dAs, Astar_all[1:], cg_tens[:-3],
@@ -73,7 +111,7 @@ def linrgmap(dA, Astar_all, cg_tens,
 
     # below are detailed implementation
     # ------------------------------\
-    # I. z-direction linearization
+    # (C.1) z-direction linearization
     dAsz = (
         bkten3d.zblock2ten(
             dAs, As.transpose([0, 1, 2, 3, 5, 4]).conj(),
@@ -84,7 +122,11 @@ def linrgmap(dA, Astar_all, cg_tens,
             pmx.conj(), pmy.conj(), pix, piy, comm=comm
         ) * c2sign[cZ]
     )
-    # II. y-direction linearization
+    # (E.2.1) Z-loop-filtering matrices linearization
+    if ver == "bistage" and loopFilter:
+        dAsz = fet3dloop.absb_mloopz(dAsz, mx, my)
+
+    # (C.2). y-direction linearization
     dAszy = (
         bkten3d.yblock2ten(
             dAsz, Asz.transpose([0, 1, 3, 2, 4, 5]).conj(),
@@ -95,7 +137,11 @@ def linrgmap(dA, Astar_all, cg_tens,
             pmz.conj(), pox.conj(), pmz, piix, comm=comm
         ) * c2sign[cY]
     )
-    # III. x-direction linearization
+    # (E.2.2) Y-loop-filtering matrices linearization
+    if ver == "bistage" and loopFilter:
+        dAszy = fet3dloop.absb_mloopy(dAszy, mz)
+
+    # (C.3) x-direction linearization
     dAc = (
         bkten3d.xblock2ten(
             dAszy, Aszy.transpose([1, 0, 2, 3, 4, 5]).conj(),
