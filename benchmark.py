@@ -180,12 +180,18 @@ def benm3DIsing(T=5.0, h=0, scheme="hotrg3d",
             print("    ", "chiII: --{:d}--".format(pars["chiII"]))
         elif scheme == "efrg":
             print("    ",
-                  "Entanglement-free RG is applied...")
+                  "Entanglement-free RG {:s} is applied...".format(ver))
             print("    ",
                   "Parameters for entanglement-filtering proces:")
+            print("    ", "  For Cube-filtering")
             print("    ", "- chis: --{:d}--".format(pars["chis"]))
             print("    ", "- chienv: --{:d}--".format(pars["chienv"]))
             print("    ", "- epsilon: --{:.2e}--".format(pars["epsilon"]))
+            if ver == "bistage":
+                print("    ", "  For Loop-filtering")
+                print("    ", "- chiMs: --{:d}--".format(pars["chiMs"]))
+                print("    ", "- chiMenv: --{:d}--".format(pars["chiMenv"]))
+                print("    ", "- epsilonM: --{:.2e}--".format(pars["epsilonM"]))
             print("    ",
                   "Parameters for block-tensor RG:")
             print("    ", "- chiM: --{:d}--".format(pars["chiM"]))
