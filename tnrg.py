@@ -965,9 +965,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
         pars={"chi": 6, "chiM": 6, "chiI": 15, "chiII": 36,
               "cg_eps": 1e-16, "display": True,
               "chis": 4, "chienv": 25, "epsilon": 1e-5,
-              "chiMs": 4, "chiMenv": 25, "epsilonM": 1e-5},
-        cubeFilter=True,
-        loopFilter=True,
+              "chiMs": 4, "chiMenv": 25, "epsilonM": 1e-5,
+              "cubeFilter": True, "loopFilter": True},
         signFix=False,
         comm=None,
         chiSet=None
@@ -984,6 +983,9 @@ class TensorNetworkRG3D(TensorNetworkRG):
         chiII = pars["chiII"]
         cg_eps = pars["cg_eps"]
         display = pars["display"]
+        # 0.3 Switch for two filtering steps
+        cubeFilter = pars["cubeFilter"]
+        loopFilter = pars["loopFilter"]
 
         if display:
             print("====================")
@@ -1397,8 +1399,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
               gaugeFix=False,
               comm=None,
               chiSet=None,
-              cubeFilter=True,
-              loopFilter=True,):
+              ):
         """
         coarse grain the tensors using schemes above
         - hotrg3d
@@ -1434,7 +1435,6 @@ class TensorNetworkRG3D(TensorNetworkRG):
                  SPerrs
                  ) = self.ef2stp_blockrg(
                      tnrg_pars,
-                     cubeFilter=cubeFilter, loopFilter=loopFilter,
                      signFix=gaugeFix)
         return lferrs, SPerrs
 
