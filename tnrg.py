@@ -1036,7 +1036,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
                 sx, sy, sz, cubeErrList
              ) = fet3dcube.optimize_alls(
                  Aout, sx, sy, sz, PsiPsiCube, epsilon=cg_eps,
-                 iter_max=100, display=display,
+                 iter_max=200, display=display,
                  checkStep=20
              )
             # - FET fidelity after optimization of s matrices
