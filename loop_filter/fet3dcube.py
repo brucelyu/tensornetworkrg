@@ -24,9 +24,91 @@ Some useful functions in `./env3d.py` and `./fet3d.py` are called
 from . import env3dcube, env3d, fet3d
 
 
-def optimize_alls(A, sx, sy, sz, PsiPsi, epsilon=1e-10,
-                  iter_max=100, display=True,
-                  checkStep=20):
+def opt_1s(dbAp, dbAgm, sold, PsiPsi,
+           epsilon=1e-10, iter_max=20):
+    """
+    This is the same as `.fet3d.opt_1s` function
+    """
+    snew = sold * 1.0
+    err = []
+    for k in range(iter_max):
+        # update s matrix
+        snew, errNew, errOld = optimize_single(
+            dbAp, dbAgm, snew, PsiPsi, epsilon
+        )
+        # record FET error
+        if k == 0:
+            err.append(errOld)
+            err.append(errNew)
+        else:
+            err.append(errNew)
+        # if FET error is very small, stop iteration
+        if errNew < epsilon:
+            break
+    return snew, err
+
+
+def optimize_alls(
+    A, sx, sy, sz, PsiPsi, epsilon=1e-10,
+    iter_max=20, n_round=2, display=True
+):
+    """find sx, sy, sz to maximaize FET fidelity
+    This is the same as `.fet3d.opt_alls` functions
+
+    """
+    leg_list = ["y", "z", "x"]
+    errList = []
+    for m in range(n_round):
+        doneLegs = {k: False for k in leg_list}
+        for leg in leg_list:
+            Ap, sxp, syp, szp = env3d.cubePermute(
+                A, sx, sy, sz, direction=leg)
+            # absorb sx, sz (prototype direction) into main tensor
+            # and construct two doubleA tensors
+            Axz = env3dcube.sOnA(Ap, sxp, szp)
+            dbAp = env3dcube.contrInLeg(Axz, Ap.conj())
+            dbAgm = env3dcube.contrInLeg(Axz, Axz.conj())
+            snew, err = opt_1s(
+                dbAp, dbAgm, syp, PsiPsi, epsilon, iter_max
+            )
+            # update s
+            if leg == "y":
+                sy = snew * 1.0
+            elif leg == "z":
+                sz = snew * 1.0
+            elif leg == "x":
+                sx = snew * 1.0
+            # record error
+            errList.append(err)
+            if display and (m % 5 == 0 or m == n_round - 1):
+                print("This is round {:d} for leg {:s}:".format(m+1, leg),
+                      "FET Error {:.3e} ---> {:.3e}".format(err[1], err[-1]),
+                      "(in {:d} iterations)".format(len(err) - 1)
+                      )
+            # if the change of FET error is small, or the FET itself is small,
+            # the optimization for the leg is done
+            doneLegs[leg] = (
+                abs((err[-1] - err[1]) / (err[1] + epsilon)
+                    ) < (0.01 * iter_max/100)
+            ) or (abs(err[-1]) < epsilon)
+
+        # Optimization for all legs done!
+        if all(doneLegs.values()):
+            if display:
+                print("  Final round {:d} for leg {:s}:".format(m+1, leg),
+                      "FET Error {:.3e} ---> {:.3e}".format(err[1], err[-1]),
+                      "(in {:d} iterations)".format(len(err) - 1)
+                      )
+            break
+
+    return sx, sy, sz, errList
+
+
+def optimize_alls_cycl(
+    A, sx, sy, sz, PsiPsi, epsilon=1e-10,
+    iter_max=100, display=True,
+    checkStep=20
+):
     """find sx, sy, sz that maximize FET fidelity
 
     Args:
@@ -68,7 +150,7 @@ def optimize_alls(A, sx, sy, sz, PsiPsi, epsilon=1e-10,
             Axz = env3dcube.sOnA(Ap, sxp, szp)
             dbAp = env3dcube.contrInLeg(Axz, Ap.conj())
             dbAgm = env3dcube.contrInLeg(Axz, Axz.conj())
-            snew, err = optimize_single(dbAp, dbAgm, syp, PsiPsi, epsilon)
+            snew, err = optimize_single(dbAp, dbAgm, syp, PsiPsi, epsilon)[:2]
             # update s
             if leg == "y":
                 sy = snew * 1.0
@@ -154,7 +236,7 @@ def optimize_single(dbAp, dbAgm, sold, PsiPsi, epsilon):
             # make sure the returned s matrix is normalized
             snew = snew / snew.norm()
             break
-    return snew, errNew
+    return snew, errNew, errOld
 
 
 def fidelity(A, sx, sy, sz, PsiPsi):

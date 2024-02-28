@@ -1036,8 +1036,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
                 sx, sy, sz, cubeErrList
              ) = fet3dcube.optimize_alls(
                  Aout, sx, sy, sz, PsiPsiCube, epsilon=cg_eps,
-                 iter_max=200, display=display,
-                 checkStep=20
+                 iter_max=5, n_round=40, display=display
              )
             # - FET fidelity after optimization of s matrices
             (err1Cube, PhiPhi1) = fet3dcube.fidelity(
@@ -1049,7 +1048,9 @@ class TensorNetworkRG3D(TensorNetworkRG):
                       "{:.3f} seconds <--".format(
                           (diffT.minutes*60 +
                            diffT.seconds +
-                           diffT.microseconds*1e-6) / len(cubeErrList)
+                           diffT.microseconds*1e-6) / (
+                               np.array(cubeErrList).flatten().size
+                           )
                       ))
                 print("--> Total wall time is",
                       "{} minutes {:.3f} seconds <--".format(
@@ -1060,8 +1061,10 @@ class TensorNetworkRG3D(TensorNetworkRG):
                       "s matrices is {:.3e}".format(err0Cube))
                 print("    Final FET error for insertion of",
                       "s matrices is {:.3e}".format(err1Cube),
-                      "({:d} iterations each leg)".format(
-                          int(len(cubeErrList)/3)
+                      "(after {:d} rounds)".format(
+                          int(
+                              len(cubeErrList) / 3
+                          )
                       ))
 
             # (E.1)S3: Absorb sx, sy, sz into the initial tensor A
