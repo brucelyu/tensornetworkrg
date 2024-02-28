@@ -217,7 +217,7 @@ def optimize_single(dbAp, dbAgm, sold, PsiPsi, epsilon):
     errOld = fet3d.cubeFidelity(sold, Ps, Gammas, PsiPsi)[1]
     # no need for optimization if the error is already very small
     if errOld < epsilon:
-        return sold, errOld
+        return sold, errOld, errOld
     # propose a candidate s
     stemp = fet3d.updateMats(Ps, Gammas, epsilon=epsilon)
     # normalized stemp (for the convex combination)
