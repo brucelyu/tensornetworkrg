@@ -24,6 +24,52 @@ Some useful functions in `./env3d.py` and `./fet3d.py` are called
 from . import env3dcube, env3d, fet3d
 
 
+# I. For initialization of s matrix
+def init_s_gilt(Gamma, chis, chienv, epsilon_init,
+                init_soft=False):
+    """
+    Initialize s matrix using `findLr`
+    The same as `.fet3d.init_s_gilt`
+    """
+    # use baby FET to find low-rank matrix
+    Lr = fet3d.findLr(Gamma, epsilon=epsilon_init,
+                      soft=init_soft, chiCut=chienv)
+    # split and truncate Lr to find s
+    # (Notes on 29 Feb. 2024) low-rank Lr can have degeneracy,
+    # we don't truncate the whole degenerate subspace here.
+    # (This is different from `.fet3d.init_s_gilt`)
+    s = Lr.split([0], [1], chis=[k+1 for k in range(chis)],
+                 eps=epsilon_init,
+                 break_degenerate=True)[0]
+    # make the direction of s as [-1, 1]
+    s = s.flip_dir(1)
+    return s, Lr
+
+
+def init_alls(A, chis, chienv, epsilon):
+    """Initialization of s matrices in 3 directions
+    The same as `.fet3d.init_alls`
+
+    Returns: sx, sy, sz
+        s matrices in 3 directions
+
+    """
+    # Construct environments for initialization of s matrices
+    # all have cost O(χ^12)
+    Gammay = env3d.cubeGamma(A, direction="y")
+    Gammaz = env3d.cubeGamma(A, direction="z")
+    Gammax = env3d.cubeGamma(A, direction="x")
+    # find initial Lr and s
+    sy, Lry = init_s_gilt(Gammay, chis, chienv, epsilon,
+                          init_soft=False)
+    sz, Lrz = init_s_gilt(Gammaz, chis, chienv, epsilon,
+                          init_soft=False)
+    sx, Lrx = init_s_gilt(Gammax, chis, chienv, epsilon,
+                          init_soft=False)
+    return sx, sy, sz, Lrx, Lry, Lrz, Gammay
+
+
+# II. For optimization of s matrix
 def opt_1s(dbAp, dbAgm, sold, PsiPsi,
            epsilon=1e-10, iter_max=20):
     """

@@ -1008,7 +1008,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
             (
                 sx, sy, sz,
                 Lrx, Lry, Lrz, Gammay
-            ) = fet3d.init_alls(Aout, chis, chienv, epsilonCube)
+            ) = fet3dcube.init_alls(Aout, chis, chienv, epsilonCube)
             if display:
                 timing1 = datetime.now()
                 diffT = relativedelta(timing1, timing0)
