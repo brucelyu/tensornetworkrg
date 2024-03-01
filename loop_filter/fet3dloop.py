@@ -32,7 +32,7 @@ The outmost x leg is left untouched in this step.
 with bond dimension changes χs --> χs^2 --> χ.
 _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 """
-from . import env3dloop, fet3d
+from . import env3dloop, fet3d, fet3dcube
 from ncon import ncon
 
 
@@ -70,10 +70,10 @@ def init_zloopm(A, chis, chienv, epsilon):
     A4x = env3dloop.swapxy(A, 1, 1)[0]
     Gammax = env3dloop.loopGamma(A4x)
     # Find initial low-rank matrix Lr and split it to get m matrix
-    my, Lry = fet3d.init_s_gilt(Gammay, chis, chienv, epsilon,
-                                init_soft=False)
-    mx, Lrx = fet3d.init_s_gilt(Gammax, chis, chienv, epsilon,
-                                init_soft=False)
+    my, Lry = fet3dcube.init_s_gilt(
+        Gammay, chis, chienv, epsilon, init_soft=False)
+    mx, Lrx = fet3dcube.init_s_gilt(
+        Gammax, chis, chienv, epsilon, init_soft=False)
     return mx, my, Lrx, Lry, Gammay
 
 
@@ -92,8 +92,8 @@ def init_yloopm(A, chis, chienv, epsilon):
     A4z = env3dloop.swapxy(Ar, 1, 1)[0]
     Gammaz = env3dloop.loopGamma(A4z)
     # Find initial low-rank matrix Lr and split it to get m matrix
-    mz, Lrz = fet3d.init_s_gilt(Gammaz, chis, chienv, epsilon,
-                                init_soft=False)
+    mz, Lrz = fet3dcube.init_s_gilt(
+        Gammaz, chis, chienv, epsilon, init_soft=False)
     return mz, Lrz, Gammaz
 
 
