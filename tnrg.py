@@ -1156,7 +1156,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
                 mx, my, ErrListLPZ
             ) = fet3dloop.optimize_zloop(
                 Aout, mx, my, PsiPsiLPZ, epsilon=cg_eps,
-                iter_max=100, checkStep=20, display=display
+                iter_max=5, n_round=40, display=display
             )
             # - FET fidelity after optimization of mx, my matrices
             (err1LPZ, PhiPhiLPZ) = fet3dloop.fidelityLPZ(
@@ -1168,7 +1168,9 @@ class TensorNetworkRG3D(TensorNetworkRG):
                       "{:.3f} seconds <--".format(
                           (diffT.minutes*60 +
                            diffT.seconds +
-                           diffT.microseconds*1e-6) / len(ErrListLPZ)
+                           diffT.microseconds*1e-6) / (
+                               np.array(ErrListLPZ).flatten().size
+                           )
                       ))
                 print("--> Total wall time is",
                       "{} minutes {:.3f} seconds <--".format(
@@ -1179,7 +1181,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
                       "mx, my matrices is {:.3e}".format(err0LPZ))
                 print("    Final FET error for insertion of",
                       "mx, my matrices is {:.3e}".format(err1LPZ),
-                      "({:d} iterations each leg)".format(
+                      "(after {:d} rounds)".format(
                           int(len(ErrListLPZ)/2)
                       ))
 
@@ -1264,7 +1266,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
                 mz, ErrListLPY
             ) = fet3dloop.optimize_yloop(
                 Aout, mz, PsiPsiLPY, epsilon=cg_eps,
-                iter_max=100, checkStep=20, display=display
+                iter_max=5, n_round=40, display=display
             )
             # - FET fidelity after optimization of mz matrix
             (err1LPY, PhiPhiLPY) = fet3dloop.fidelityLPY(
@@ -1276,7 +1278,9 @@ class TensorNetworkRG3D(TensorNetworkRG):
                       "{:.3f} seconds <--".format(
                           (diffT.minutes +
                            diffT.seconds +
-                           diffT.microseconds*1e-6) / len(ErrListLPY)
+                           diffT.microseconds*1e-6) / (
+                               np.array(ErrListLPY).flatten().size
+                           )
                       ))
                 print("--> Total wall time is",
                       "{} minutes {:.3f} seconds <--".format(
@@ -1287,7 +1291,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
                       "mz matrices is {:.3e}".format(err0LPY))
                 print("    Final FET error for insertion of",
                       "mz matrices is {:.3e}".format(err1LPY),
-                      "({:d} iterations each leg)".format(
+                      "(after {:d} rounds)".format(
                           len(ErrListLPY)
                       ))
 

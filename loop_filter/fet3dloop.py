@@ -97,7 +97,9 @@ def init_yloopm(A, chis, chienv, epsilon):
     return mz, Lrz, Gammaz
 
 
-def optimize_zloop(A, mx, my, PsiPsi, epsilon=1e-10,
+# ------------------------------------------------\\
+# Optimize y -> x -> y -> x -> ... in a cyclic way
+def optimize_zloop_v0(A, mx, my, PsiPsi, epsilon=1e-10,
                    iter_max=100, display=True,
                    swapList=[False, True], checkStep=10):
     """find mx, my matricees that maximize FET fidelity
@@ -141,7 +143,7 @@ def optimize_zloop(A, mx, my, PsiPsi, epsilon=1e-10,
             # absorb the constant m matrix (mxp) into dbA tensor
             dbAp, dbAgm = env3dloop.mxAssemble(dbA, mxp)
             # using FET to optimize the other m matrix (myp)
-            mnew, err = optimize_single(dbAp, dbAgm, myp, PsiPsi, epsilon)
+            mnew, err = optimize_single(dbAp, dbAgm, myp, PsiPsi, epsilon)[:2]
             # update the other m matrix
             if isSwap:
                 mx = mnew * 1.0
@@ -176,7 +178,7 @@ def optimize_zloop(A, mx, my, PsiPsi, epsilon=1e-10,
     return mx, my, errList
 
 
-def optimize_yloop(A, mz, PsiPsi, epsilon=1e-10,
+def optimize_yloop_v0(A, mz, PsiPsi, epsilon=1e-10,
                    iter_max=100, display=True,
                    checkStep=10):
     """find mz matrices that maximize FET fidelity
@@ -200,7 +202,7 @@ def optimize_yloop(A, mz, PsiPsi, epsilon=1e-10,
     for k in range(iter_max):
         dbA = env3dloop.contrInLeg(Ap, Ap.conj())
         # using FET to optimize the mz matrix
-        mz, err = optimize_single(dbA, dbA, mz, PsiPsi, epsilon)
+        mz, err = optimize_single(dbA, dbA, mz, PsiPsi, epsilon)[:2]
         # record FET error
         errList.append(err)
         # check the change of FET error
@@ -227,6 +229,138 @@ def optimize_yloop(A, mz, PsiPsi, epsilon=1e-10,
         if doneLeg:
             break
     return mz, errList
+# ------------------------------------------------//
+
+
+# ------------------------------------------------\\
+# Optimize round by round:
+# for each round, a single leg is updated a few times
+def optimize_zloop(
+    A, mx, my, PsiPsi, epsilon=1e-10,
+    iter_max=20, n_round=2, display=True
+):
+    """find mx, my matricees that maximize FET fidelity
+    """
+    leg_list = ["y", "x"]
+    legSwapDic = {"y": False, "x": True}
+    errList = []
+    for m in range(n_round):
+        doneLegs = {k: False for k in leg_list}
+        for leg in leg_list:
+            Ap, mxp, myp = env3dloop.swapxy(
+                A, mx, my, legSwapDic[leg]
+            )
+            # This is the bottleneck of the computational cost
+            # in this loop-filtering process.
+            # The cost is χ^8
+            dbA = env3dloop.contrInLeg(Ap, Ap.conj())
+            # absorb the constant m matrix (mxp) into dbA tensor
+            dbAp, dbAgm = env3dloop.mxAssemble(dbA, mxp)
+            # using FET to optimize the other m matrix (myp)
+            mnew, err = opt_1s(
+                dbAp, dbAgm, myp, PsiPsi, epsilon, iter_max
+            )
+            if leg == "y":
+                my = mnew * 1.0
+            elif leg == "x":
+                mx = mnew * 1.0
+            # record error
+            errList.append(err)
+            # print change of FET error in a round
+            if display and (m % 5 == 0 or m == n_round - 1):
+                print("This is round {:d} for leg {:s}:".format(m+1, leg),
+                      "FET-loop Error {:.3e} ---> {:.3e}".format(
+                          err[1], err[-1]),
+                      "(in {:d} iterations)".format(len(err) - 1)
+                      )
+            # if the change of FET error is small, or the FET itself is small,
+            # the optimization for the leg is done
+            doneLegs[leg] = (
+                abs((err[-1] - err[1]) / (err[1] + epsilon)
+                    ) < (0.01 * iter_max/100)
+            ) or (abs(err[-1]) < epsilon)
+
+        # Optimization for all legs done!
+        if all(doneLegs.values()):
+            if display:
+                print("  Final round {:d} for leg {:s}:".format(m+1, leg),
+                      "FET-loop Error {:.3e} ---> {:.3e}".format(
+                          err[1], err[-1]),
+                      "(in {:d} iterations)".format(len(err) - 1)
+                      )
+            break
+    return mx, my, errList
+
+
+def optimize_yloop(
+    A, mz, PsiPsi, epsilon=1e-10,
+    iter_max=20, n_round=2, display=True
+):
+    """find mz matrices that maximize FET fidelity
+    """
+    errList = []
+    # rotate the tensor leg: xyz --> zxy
+    Ap = A.transpose([4, 5, 0, 1, 2, 3])
+    # (Swap zx leg)
+    Ap = env3dloop.swapxy(Ap, 1, 1)[0]
+    # construct double A tensor
+    dbA = env3dloop.contrInLeg(Ap, Ap.conj())
+    for m in range(n_round):
+        doneLeg = False
+        # using FET to optimize the mz matrix
+        mz, err = opt_1s(
+            dbA, dbA, mz, PsiPsi, epsilon, iter_max
+        )
+        # record error
+        errList.append(err)
+        if display and (m % 5 == 0 or m == n_round - 1):
+            print("This is round {:d} for leg {:s}:".format(m+1, "z"),
+                  "FET-loop Error {:.3e} ---> {:.3e}".format(
+                      err[1], err[-1]),
+                  "(in {:d} iterations)".format(len(err) - 1)
+                  )
+        # if the change of FET error is small, or the FET itself is small,
+        # the optimization for the leg is done
+        doneLeg = (
+            abs((err[-1] - err[1]) / (err[1] + epsilon)
+                ) < (0.01 * iter_max/100)
+        ) or (abs(err[-1]) < epsilon)
+
+        # Optimization for the leg done!
+        if doneLeg:
+            if display:
+                print("  Final round {:d} for leg {:s}:".format(m+1, "z"),
+                      "FET-loop Error {:.3e} ---> {:.3e}".format(
+                          err[1], err[-1]),
+                      "(in {:d} iterations)".format(len(err) - 1)
+                      )
+            break
+    return mz, errList
+# ------------------------------------------------//
+
+
+def opt_1s(dbAp, dbAgm, sold, PsiPsi,
+           epsilon=1e-10, iter_max=20):
+    """
+    This is the same as `.fet3d.opt_1s` function
+    """
+    snew = sold * 1.0
+    err = []
+    for k in range(iter_max):
+        # update s matrix
+        snew, errNew, errOld = optimize_single(
+            dbAp, dbAgm, snew, PsiPsi, epsilon
+        )
+        # record FET error
+        if k == 0:
+            err.append(errOld)
+            err.append(errNew)
+        else:
+            err.append(errNew)
+        # if FET error is very small, stop iteration
+        if errNew < epsilon:
+            break
+    return snew, err
 
 
 def optimize_single(dbAp, dbAgm, mold, PsiPsi, epsilon):
@@ -258,7 +392,7 @@ def optimize_single(dbAp, dbAgm, mold, PsiPsi, epsilon):
     errOld = fet3d.cubeFidelity(mold, Pm, Gammam, PsiPsi)[1]
     # no need for optimization if the error is already very small
     if errOld < epsilon:
-        return mold, errOld
+        return mold, errOld, errOld
     # propose a candidate s
     mtemp = fet3d.updateMats(Pm, Gammam, epsilon=epsilon)
     # normalized stemp (for the convex combination)
@@ -277,7 +411,7 @@ def optimize_single(dbAp, dbAgm, mold, PsiPsi, epsilon):
             # make sure the returned s matrix is normalized
             mnew = mnew / mnew.norm()
             break
-    return mnew, errNew
+    return mnew, errNew, errOld
 
 
 # For absorbing mx, my, mz matrices into the intermediate main tensors
