@@ -966,7 +966,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
               "cg_eps": 1e-16, "display": True,
               "chis": 4, "chienv": 25, "epsilon": 1e-5,
               "chiMs": 4, "chiMenv": 25, "epsilonM": 1e-5,
-              "cubeFilter": True, "loopFilter": True},
+              "cubeFilter": True, "loopFilter": True,
+              "cubeYZmore": False},
         signFix=False,
         comm=None,
         chiSet=None
@@ -984,8 +985,9 @@ class TensorNetworkRG3D(TensorNetworkRG):
         cg_eps = pars["cg_eps"]
         display = pars["display"]
         # 0.3 Switch for two filtering steps
-        cubeFilter = pars["cubeFilter"]
-        loopFilter = pars["loopFilter"]
+        cubeFilter = pars.get("cubeFilter", True)
+        loopFilter = pars.get("loopFilter", True)
+        cubeYZmore = pars.get("cubeYZmore", False)
 
         if display:
             print("====================")
@@ -1008,7 +1010,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
             (
                 sx, sy, sz,
                 Lrx, Lry, Lrz, Gammay
-            ) = fet3dcube.init_alls(Aout, chis, chienv, epsilonCube)
+            ) = fet3dcube.init_alls(Aout, chis, chienv, epsilonCube,
+                                    cubeYZmore=cubeYZmore)
             if display:
                 timing1 = datetime.now()
                 diffT = relativedelta(timing1, timing0)

@@ -46,7 +46,8 @@ def init_s_gilt(Gamma, chis, chienv, epsilon_init,
     return s, Lr
 
 
-def init_alls(A, chis, chienv, epsilon):
+def init_alls(A, chis, chienv, epsilon,
+              cubeYZmore=False):
     """Initialization of s matrices in 3 directions
     The same as `.fet3d.init_alls`
 
@@ -60,10 +61,17 @@ def init_alls(A, chis, chienv, epsilon):
     Gammaz = env3d.cubeGamma(A, direction="z")
     Gammax = env3d.cubeGamma(A, direction="x")
     # find initial Lr and s
-    sy, Lry = init_s_gilt(Gammay, chis, chienv, epsilon,
-                          init_soft=False)
-    sz, Lrz = init_s_gilt(Gammaz, chis, chienv, epsilon,
-                          init_soft=False)
+    if cubeYZmore:
+        # keep the `chienv` but truncate more when splitting Lr
+        sy, Lry = init_s_gilt(Gammay, chis-1, chienv, epsilon,
+                              init_soft=False)
+        sz, Lrz = init_s_gilt(Gammaz, chis-1, chienv, epsilon,
+                              init_soft=False)
+    else:
+        sy, Lry = init_s_gilt(Gammay, chis, chienv, epsilon,
+                              init_soft=False)
+        sz, Lrz = init_s_gilt(Gammaz, chis, chienv, epsilon,
+                              init_soft=False)
     sx, Lrx = init_s_gilt(Gammax, chis, chienv, epsilon,
                           init_soft=False)
     return sx, sy, sz, Lrx, Lry, Lrz, Gammay
