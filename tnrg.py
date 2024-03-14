@@ -988,11 +988,101 @@ class TensorNetworkRG3D(TensorNetworkRG):
         cubeFilter = pars.get("cubeFilter", True)
         loopFilter = pars.get("loopFilter", True)
         cubeYZmore = pars.get("cubeYZmore", False)
+        XloopF = pars.get("XloopF", False)
 
         if display:
             print("====================")
             print("Start {:d} RG step...".format(self.iter_n+1))
+
         # -----~~~>> Entanglement Filtering
+        # (E.0) x-loop filtering on input tensor `A`
+        if loopFilter and XloopF:
+            if display:
+                print("  >>~~~~X-Loop-Filter~~~~~~>>")
+            # (E.0)S0: Set parameters for X-loop filtering
+            chiXs = int(np.ceil((pars["chi"] + pars["chis"]) / 2))
+            chiXenv = chiXs**2
+            epsilonX = pars["epsilon"]
+
+            # (E.0)S1: Initialize mXy, mXz matrices (a GILT-like method)
+            if display:
+                timing0 = datetime.now()
+            (
+                mXy, mXz, mXLry, mXLrz, GammaLPXz
+            ) = fet3dloop.init_xloopm(Aout, chiXs, chiXenv, epsilonX)
+            if display:
+                timing1 = datetime.now()
+                diffT = relativedelta(timing1, timing0)
+                print("--> X-Loop-filter initialization takes",
+                      "{} minutes {:.3f} seconds <--".format(
+                          diffT.minutes,
+                          diffT.seconds + diffT.microseconds*1e-6
+                      ))
+                print("Shape of initial mXy is {}.".format(mXy.shape),
+                      "(Qhape is {}).".format(mXy.qhape))
+                print("Shape of initial mXz is {}.".format(mXz.shape),
+                      "(Qhape is {}).".format(mXz.qhape))
+
+            # (E.0)S2: Optimize mXy, mXz matrices using FET
+            # - Compute <ψ|ψ> for calculating initialization fidelity
+            PsiPsiLPX = ncon([GammaLPXz], [[1, 1, 2, 2]])
+            # - FET fidelity of inserting initial s matrices
+            err0LPX = fet3dloop.fidelityLPX(Aout, mXy, mXz, PsiPsiLPX)[1]
+            # - Optimization of mXy, mXz matrices
+            if display:
+                timing0 = datetime.now()
+            (
+                mXy, mXz, ErrListLPX
+            ) = fet3dloop.optimize_xloop(
+                Aout, mXy, mXz, PsiPsiLPX, epsilon=cg_eps,
+                iter_max=5, n_round=40, display=display
+            )
+            # - FET fidelity after optimization of mx, my matrices
+            (err1LPX, PhiPhiLPX) = fet3dloop.fidelityLPX(
+                Aout, mXy, mXz, PsiPsiLPX)[1:]
+            if display:
+                timing1 = datetime.now()
+                diffT = relativedelta(timing1, timing0)
+                print("--> Each X-Loop-FET iteration takes",
+                      "{:.3f} seconds <--".format(
+                          (diffT.minutes*60 +
+                           diffT.seconds +
+                           diffT.microseconds*1e-6) / (
+                               np.array(ErrListLPX).flatten().size
+                           )
+                      ))
+                print("--> Total wall time is",
+                      "{} minutes {:.3f} seconds <--".format(
+                          diffT.minutes,
+                          diffT.seconds + diffT.microseconds*1e-6
+                      ))
+                print("  Initial FET error for insertion of",
+                      "mXy, mXz matrices is {:.3e}".format(err0LPX))
+                print("    Final FET error for insertion of",
+                      "mXy, mXz matrices is {:.3e}".format(err1LPX),
+                      "(after {:d} rounds)".format(
+                          int(len(ErrListLPX)/2)
+                      ))
+
+            # (E.0)S3: Absorb mXy, mXz into the tensor A
+            # - Take care the overall magnitude of m matrices to
+            # make sure that <ψ|ψ> = <φ|φ>.
+            # - This magnitude contributes to the total free energy
+            # but is not essential for the conformal data.
+            PsiDivPhi = (PsiPsiLPX / PhiPhiLPX).norm()
+            # - Factor 16 since there are 16 m matrices in <φ|φ>
+            mXy = mXy * (PsiDivPhi)**(1/16)
+            mXz = mXz * (PsiDivPhi)**(1/16)
+            # - Absorb mXy, mXz to two outer legs of
+            # (++)-position tensor A
+            # so the two legs are squeezed due to filtering
+            Aout = fet3dloop.absb_mloopx(Aout, mXy, mXz)
+            if display:
+                print("  <<~~~~~~~~~~<<")
+        else:
+            err0LPX, err1LPX = [0 for k in range(2)]
+        # -----~~~<<
+
         # (E.1) cube-filtering on input tensor `A`
         # Approximate 8-copies of `A` forming a cube
         # determine sx, sy, sz matrices and apply them
