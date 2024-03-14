@@ -1048,7 +1048,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
                           (diffT.minutes*60 +
                            diffT.seconds +
                            diffT.microseconds*1e-6) / (
-                               np.array(ErrListLPX).flatten().size
+                               len(flatten(ErrListLPX))
                            )
                       ))
                 print("--> Total wall time is",
@@ -1142,7 +1142,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
                           (diffT.minutes*60 +
                            diffT.seconds +
                            diffT.microseconds*1e-6) / (
-                               np.array(cubeErrList).flatten().size
+                               len(flatten(cubeErrList))
                            )
                       ))
                 print("--> Total wall time is",
@@ -1262,7 +1262,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
                           (diffT.minutes*60 +
                            diffT.seconds +
                            diffT.microseconds*1e-6) / (
-                               np.array(ErrListLPZ).flatten().size
+                               len(flatten(ErrListLPZ))
                            )
                       ))
                 print("--> Total wall time is",
@@ -1372,7 +1372,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
                           (diffT.minutes +
                            diffT.seconds +
                            diffT.microseconds*1e-6) / (
-                               np.array(ErrListLPY).flatten().size
+                               len(flatten(ErrListLPY))
                            )
                       ))
                 print("--> Total wall time is",
@@ -1703,3 +1703,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
             np.log(ncon([ten_cur], [[1, 1, 2, 2, 3, 3]]))
         )
         return g
+
+
+def flatten(xss):
+    return [x for xs in xss for x in xs]
