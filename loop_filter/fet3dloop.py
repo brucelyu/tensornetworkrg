@@ -97,6 +97,24 @@ def init_yloopm(A, chis, chienv, epsilon):
     return mz, Lrz, Gammaz
 
 
+def init_xloopm(A, chis, chienv, epsilon):
+    # Construct the γ environment for initialization of m matrices
+    # (rotate A leg: xyz --> yzx)
+    # Environment for z-leg
+    Ar = A.transpose([2, 3, 4, 5, 0, 1])
+    Gammaz = env3dloop.loopGamma(Ar)
+    # (Swap yz leg)
+    # Environment for y-leg
+    Ar4y = env3dloop.swapxy(Ar, 1, 1)[0]
+    Gammay = env3dloop.loopGamma(Ar4y)
+
+    # Find initial low-rank matrix Lr and split it to get m matrix
+    mz, Lrz = fet3dcube.init_s_gilt(
+        Gammaz, chis, chienv, epsilon, init_soft=False)
+    my, Lry = fet3dcube.init_s_gilt(
+        Gammay, chis, chienv, epsilon, init_soft=False)
+    return my, mz, Lry, Lrz, Gammaz
+
 # ------------------------------------------------\\
 # Optimize y -> x -> y -> x -> ... in a cyclic way
 def optimize_zloop_v0(A, mx, my, PsiPsi, epsilon=1e-10,
@@ -239,7 +257,7 @@ def optimize_zloop(
     A, mx, my, PsiPsi, epsilon=1e-10,
     iter_max=20, n_round=2, display=True
 ):
-    """find mx, my matricees that maximize FET fidelity
+    """find mx, my matrices that maximize FET fidelity
     """
     leg_list = ["y", "x"]
     legSwapDic = {"y": False, "x": True}
@@ -296,7 +314,7 @@ def optimize_yloop(
     A, mz, PsiPsi, epsilon=1e-10,
     iter_max=20, n_round=2, display=True
 ):
-    """find mz matrices that maximize FET fidelity
+    """find mz matrix that maximize FET fidelity
     """
     errList = []
     # rotate the tensor leg: xyz --> zxy
@@ -336,6 +354,65 @@ def optimize_yloop(
                       )
             break
     return mz, errList
+
+
+def optimize_xloop(
+    A, my, mz, PsiPsi, epsilon=1e-10,
+    iter_max=20, n_round=2, display=True
+):
+    """find my, mz matrices that maximize FET fidelity
+    """
+    leg_list = ["z", "y"]
+    legSwapDic = {"z": False, "y": True}
+    errList = []
+    # rotate the tensor leg: xyz --> yzx
+    Ar = A.transpose([2, 3, 4, 5, 0, 1])
+    for m in range(n_round):
+        doneLegs = {k: False for k in leg_list}
+        for leg in leg_list:
+            Ap, myp, mzp = env3dloop.swapxy(
+                Ar, my, mz, legSwapDic[leg]
+            )
+            # This is the bottleneck of the computational cost
+            # in this loop-filtering process.
+            # The cost is χ^8
+            dbA = env3dloop.contrInLeg(Ap, Ap.conj())
+            # absorb the constant m matrix (myp) into dbA tensor
+            dbAp, dbAgm = env3dloop.mxAssemble(dbA, myp)
+            # using FET to optimize the other m matrix (mzp)
+            mnew, err = opt_1s(
+                dbAp, dbAgm, mzp, PsiPsi, epsilon, iter_max
+            )
+            if leg == "z":
+                mz = mnew * 1.0
+            elif leg == "y":
+                my = mnew * 1.0
+            # record error
+            errList.append(err)
+            # print change of FET error in a round
+            if display and (m % 5 == 0 or m == n_round - 1):
+                print("This is round {:d} for leg {:s}:".format(m+1, leg),
+                      "FET-loop Error {:.3e} ---> {:.3e}".format(
+                          err[1], err[-1]),
+                      "(in {:d} iterations)".format(len(err) - 1)
+                      )
+            # if the change of FET error is small, or the FET itself is small,
+            # the optimization for the leg is done
+            doneLegs[leg] = (
+                abs((err[-1] - err[1]) / (err[1] + epsilon)
+                    ) < (0.01 * iter_max/100)
+            ) or (abs(err[-1]) < epsilon)
+
+        # Optimization for all legs done!
+        if all(doneLegs.values()):
+            if display:
+                print("  Final round {:d} for leg {:s}:".format(m+1, leg),
+                      "FET-loop Error {:.3e} ---> {:.3e}".format(
+                          err[1], err[-1]),
+                      "(in {:d} iterations)".format(len(err) - 1)
+                      )
+            break
+    return my, mz, errList
 # ------------------------------------------------//
 
 
@@ -441,6 +518,19 @@ def absb_mloopy(Azy, mz):
     return Azym
 
 
+# A3. For x-loop filtering: my and mz
+def absb_mloopx(A, my, mz):
+    """
+    Apply mx, my matricx to
+        Az: intermediate tensor after the first z-collapse
+    """
+    Am = ncon(
+        [A, my, mz],
+        [[-1, -2, 1, -4, 2, -6], [1, -3], [2, -5]]
+    )
+    return Am
+
+
 # Fidelity of z-loop and y-loop
 def fidelityLPZ(Az, mx, my, PsiPsi):
     dbA = env3dloop.contrInLeg(Az, Az.conj())
@@ -457,5 +547,15 @@ def fidelityLPY(Azy, mz, PsiPsi):
     Azyr = env3dloop.swapxy(Azyr, 1, 1)[0]
     dbA = env3dloop.contrInLeg(Azyr, Azyr.conj())
     Pmz, Gammamz = env3dloop.dbA2FETenv(dbA, dbA, mz)
+    f, err, PhiPhi = fet3d.cubeFidelity(mz, Pmz, Gammamz, PsiPsi)
+    return f, err, PhiPhi
+
+
+def fidelityLPX(A, my, mz, PsiPsi):
+    # rotate the tensor leg: xyz --> yzx
+    Ar = A.transpose([2, 3, 4, 5, 0, 1])
+    dbA = env3dloop.contrInLeg(Ar, Ar.conj())
+    dbAp, dbAgm = env3dloop.mxAssemble(dbA, my)
+    Pmz, Gammamz = env3dloop.dbA2FETenv(dbAp, dbAgm, mz)
     f, err, PhiPhi = fet3d.cubeFidelity(mz, Pmz, Gammamz, PsiPsi)
     return f, err, PhiPhi
