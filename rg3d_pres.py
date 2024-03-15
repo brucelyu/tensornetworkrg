@@ -877,10 +877,10 @@ def plot2stgEFRG(chi, lrerrsList, SPerrsList,
     SPplot = [[rgerr[1][1], rgerr[2][0], rgerr[2][1],
                rgerr[0][0], rgerr[0][2], rgerr[1][0]] for rgerr in SPerrsList]
     SPplot = np.array(SPplot)
-    lrerrsList[0] = [[0, 0], [0, 0], [0, 0]]
+    lrerrsList[0] = [[0, 0], [0, 0], [0, 0], [0, 0]]
     lrerr = np.array(lrerrsList)
-    fig, axs = plt.subplots(4, 1, figsize=(10, 8),
-                            gridspec_kw={'height_ratios': [3, 1, 1, 1]})
+    fig, axs = plt.subplots(5, 1, figsize=(10, 10),
+                            gridspec_kw={'height_ratios': [4, 1, 1, 1, 1]})
     ax1 = axs[0]
     ax1.plot(SPplot[startn:endn, 0], "r+-", alpha=0.4, label="Outmost x")
     ax1.plot(SPplot[startn:endn, 1], "yx-", alpha=0.4, label="Outmost y")
@@ -916,5 +916,13 @@ def plot2stgEFRG(chi, lrerrsList, SPerrsList,
     ax4.set_ylabel("FET errors")
     ax4.set_yscale("log")
     ax4.legend()
+    ax5 = axs[4]
+    ax5.plot(lrerr[startn:endn, 3, 0], "g.--", alpha=0.4,
+             label="X-loop (Initial)")
+    ax5.plot(lrerr[startn:endn, 3, 1], "k.--", alpha=0.4,
+             label="X-loop (Optimized)")
+    ax5.set_ylabel("FET errors")
+    ax5.set_yscale("log")
+    ax5.legend()
     plt.savefig(figFile, bbox_inches='tight',
                 dpi=300)

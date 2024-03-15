@@ -1489,7 +1489,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
         # - Loop filtering
         lrerr = [[err0Cube, err1Cube],
                  [err0LPZ, err1LPZ],
-                 [err0LPY, err1LPY]]
+                 [err0LPY, err1LPY],
+                 [err0LPX, err1LPX]]
         # block-tensor RG errors
         rgerr = [zerrs, yerrs, xerrs]
         return lrerr, rgerr
