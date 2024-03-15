@@ -1473,6 +1473,10 @@ class TensorNetworkRG3D(TensorNetworkRG):
                                 verbose=display)
 
         # update the isometric tensors for block-tensor RG
+        if loopFilter and XloopF:
+            # absorb X-loop filtering matrices into cube matrices
+            sy = ncon([mXy, sy], [[-1, 1], [1, -2]])
+            sz = ncon([mXz, sz], [[-1, 1], [1, -2]])
         self.isometry_applied = [
             pox, poy, poz, pmx, pmy, pmz, pix, piy, piix,
             sx, sy, sz, mx, my, mz
