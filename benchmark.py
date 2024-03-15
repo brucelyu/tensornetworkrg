@@ -287,11 +287,10 @@ def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
             # we always use the basic block-tensor RG
             # and fix the output χ=10 or 6
             pars_0rg = tnrg_pars.copy()
-            # turn off this trick now
-            if tnrg_pars["chi"] in [7, 8, 9] and False:
-                pars_0rg["chi"] = 6
-                pars_0rg["chiM"] = 6
-                pars_0rg["chiI"] = 6
+            if tnrg_pars["chi"] in [7, 8, 9]:
+                pars_0rg["chi"] = 10
+                pars_0rg["chiM"] = 4
+                pars_0rg["chiI"] = 4
                 pars_0rg["chiII"] = 16
             (
              lrerrs,
