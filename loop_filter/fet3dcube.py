@@ -62,10 +62,10 @@ def init_alls(A, chis, chienv, epsilon,
     Gammax = env3d.cubeGamma(A, direction="x")
     # find initial Lr and s
     if cubeYZmore:
-        # keep the `chienv` but truncate more when splitting Lr
-        sy, Lry = init_s_gilt(Gammay, chis-1, chienv, epsilon,
+        # truncating to χs-1
+        sy, Lry = init_s_gilt(Gammay, chis-1, (chis-1)**2, epsilon,
                               init_soft=False)
-        sz, Lrz = init_s_gilt(Gammaz, chis-1, chienv, epsilon,
+        sz, Lrz = init_s_gilt(Gammaz, chis-1, (chis-1)**2, epsilon,
                               init_soft=False)
     else:
         sy, Lry = init_s_gilt(Gammay, chis, chienv, epsilon,

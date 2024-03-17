@@ -1000,7 +1000,11 @@ class TensorNetworkRG3D(TensorNetworkRG):
             if display:
                 print("  >>~~~~X-Loop-Filter~~~~~~>>")
             # (E.0)S0: Set parameters for X-loop filtering
-            chiXs = int(np.ceil((pars["chi"] + pars["chis"]) / 2))
+            if cubeYZmore:
+                chiXs = int(np.ceil((pars["chi"] + pars["chis"]-1) / 2))
+                # chiXs = pars["chiMs"]
+            else:
+                chiXs = int(np.ceil((pars["chi"] + pars["chis"]) / 2))
             chiXenv = chiXs**2
             epsilonX = pars["epsilon"]
 
