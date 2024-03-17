@@ -872,7 +872,8 @@ def plotefrg(chi, lrerrsList, SPerrsList,
 
 
 def plot2stgEFRG(chi, lrerrsList, SPerrsList,
-                 startn, endn, figFile):
+                 startn, endn, figFile,
+                 ylow=None):
     # process lrerrsList and SPerrsList
     SPplot = [[rgerr[1][1], rgerr[2][0], rgerr[2][1],
                rgerr[0][0], rgerr[0][2], rgerr[1][0]] for rgerr in SPerrsList]
@@ -891,6 +892,7 @@ def plot2stgEFRG(chi, lrerrsList, SPerrsList,
     ax1.set_ylabel("RG errors")
     ax1.set_yscale("log")
     ax1.set_title(r"$\chi = ${:d} (bistage-FET + block-tensor)".format(chi))
+    ax1.set_ylim(bottom=ylow)
     ax1.legend()
     ax2 = axs[1]
     ax2.plot(lrerr[startn:endn, 0, 0], "g.--", alpha=0.4,
