@@ -144,7 +144,8 @@ def xfindp(Azy, chi, cg_eps=1e-8,
 
 # II. For block-tensor transformation along a single direction
 
-def zblock2ten(A, B, pxc, pyc, px, py, comm=None):
+# /// ------ This contraction reuse the usual HOTRG idea -------- \\\
+def zblock2tenN(A, B, pxc, pyc, px, py, comm=None):
     # contraction for coarse graining process
     # This version has computation cost O(chi^11) and
     # memory cost O(chi^8). The memory cost can be reduced to O(chi^6).
@@ -156,65 +157,146 @@ def zblock2ten(A, B, pxc, pyc, px, py, comm=None):
     return Aout
 
 
-def yblock2ten(A, B, pzc, pxc, pz, px, comm=None):
+def yblock2tenN(A, B, pzc, pxc, pz, px, comm=None):
     perm = [4, 5, 0, 1, 2, 3]
     inv_perm = [2, 3, 4, 5, 0, 1]
     # Rotate to prototypical position
     Ar = A.transpose(perm)
     Br = B.transpose(perm)
     # Call `zblock2ten` to contract
-    AB = zblock2ten(Ar, Br, pzc, pxc, pz, px, comm)
+    AB = zblock2tenN(Ar, Br, pzc, pxc, pz, px, comm)
     # Rotate back to absolute position
     AB = AB.transpose(inv_perm)
     return AB
 
 
-def xblock2ten(A, B, pyc, pzc, py, pz, comm=None):
+def xblock2tenN(A, B, pyc, pzc, py, pz, comm=None):
     perm = [2, 3, 4, 5, 0, 1]
     inv_perm = [4, 5, 0, 1, 2, 3]
     # Rotate to prototypical position
     Ar = A.transpose(perm)
     Br = B.transpose(perm)
     # Call `zblock2ten` to contract
-    AB = zblock2ten(Ar, Br, pyc, pzc, py, pz, comm)
+    AB = zblock2tenN(Ar, Br, pyc, pzc, py, pz, comm)
     # Rotate back to absolute position
     AB = AB.transpose(inv_perm)
     return AB
+# \\\ ------ ------------------------------------------- -------- ///
 
 
-# All 1-direction tensor contraction is calling this as prototype
-# including `yblock` and `xblock`
-def zblock(A, pxc, pyc, px, py, comm=None):
-    # contraction for coarse graining process
-    # This version has computation cost O(chi^11) and
-    # memory cost O(chi^8). The memory cost can be reduced to O(chi^6).
-    Aout = zblock2ten(A, A.transpose([0, 1, 2, 3, 5, 4]).conj(),
-                      pxc, pyc, px, py, comm)
+# - A more efficient contraction for `block2ten` functions
+def zblock2ten(A, B, pxc, pyc, px, py, comm=None):
+    # z-direction collapse of HOTRG-like block-tensor map
+    # The relative bond dimensions are χ, χm, xi
+    # Computational cost: χ^9 χm^2, which is χ^11 for χm ~ χ
+    # Memory imprint    : χ^6 χm^2, which is χ^8  for χm ~ χ
+    if comm is None:
+        Aout = ncon([A, B, pxc, pyc, px, py],
+                    [
+                        [1, 6, 2, 8, -5, 3], [4, 7, 5, 9, 3, -6],
+                        [1, 4, -1], [2, 5, -3], [6, 7, -2], [8, 9, -4]
+                    ])
+    else:
+        # parallelization codes
+        pass
     return Aout
 
 
-# This calls `zblock`
-def yblock(Az, pzc, pxc, pz, px, comm=None):
+def yblock2ten(A, B, pzc, pxc, pz, px, comm=None):
+    # y-direction collapse of HOTRG-like block-tensor map
+    # The relative bond dimensions are χ, χm, χi, χii
+    # Computational cost: χ^3 χm^5 χi^3, which is χ^8 χi^3 for χm ~ χ
+    # Memory imprint    : χ^2 χm^4 χi^2, which is χ^6 χi^2 for χm ~ χ
+    if comm is None:
+        Aout = ncon([A, B, pzc, pxc, pz, px],
+                    [
+                        [7, 8, -3, 4, 1, 2], [3, 9, 4, -4, 5, 6],
+                        [1, 5, -5], [7, 3, -1], [2, 6, -6], [8, 9, -2]
+                    ])
+    else:
+        # parallelization codes
+        pass
+    return Aout
+
+
+def xblock2ten(A, B, pyc, pzc, py, pz, comm=None):
+    # x-direction collapse of HOTRG-like block-tensor map
+    # The relative bond dimensions are χ, χm, χii
+    # Computational cost: χ^6 χm^4 χii, which is χ^10 χii for χm ~ χ
+    # Memory imprint    : χ^3 χm^4 χii, which is χ^7 χii for χm ~ χ
+    if comm is None:
+        Aout = ncon([A, B, pyc, pzc, py, pz],
+                    [
+                        [-1, 5, 1, 2, 6, 7], [5, -2, 8, 9, 3, 4],
+                        [1, 8, -3], [6, 3, -5], [2, 9, -4], [7, 4, -6]
+                    ])
+    else:
+        # parallelization codes
+        pass
+    return Aout
+
+
+# /// ------ This contraction reuse the usual HOTRG idea -------- \\\
+# All 1-direction tensor contraction is calling this as prototype
+# including `yblock` and `xblock`
+def zblockN(A, pxc, pyc, px, py, comm=None):
+    # contraction for coarse graining process
+    # This version has computation cost O(chi^11) and
+    # memory cost O(chi^8). The memory cost can be reduced to O(chi^6).
+    Aout = zblock2tenN(A, A.transpose([0, 1, 2, 3, 5, 4]).conj(),
+                       pxc, pyc, px, py, comm)
+    return Aout
+
+
+# This calls `zblockN`
+def yblockN(Az, pzc, pxc, pz, px, comm=None):
     # rotate to the prototpye position
     # rotation xyz --> zxy
     Ar = Az.transpose([4, 5, 0, 1, 2, 3])
     # call `zblock` to contract
-    Azy = zblock(Ar, pzc, pxc, pz, px, comm=comm)
+    Azy = zblockN(Ar, pzc, pxc, pz, px, comm=comm)
     # rotate back to absolute position
     Azy = Azy.transpose([2, 3, 4, 5, 0, 1])
     return Azy
 
 
-# This calls `zblock`
-def xblock(Azy, pyc, pzc, py, pz, comm=None):
+# This calls `zblockN`
+def xblockN(Azy, pyc, pzc, py, pz, comm=None):
     # rotate to the prototpye position
     # rotation xyz --> yzx
     Ar = Azy.transpose([2, 3, 4, 5, 0, 1])
     # call `zblock` to contract
-    Ac = zblock(Ar, pyc, pzc, py, pz, comm=comm)
+    Ac = zblockN(Ar, pyc, pzc, py, pz, comm=comm)
     # rotate back
     Ac = Ac.transpose([4, 5, 0, 1, 2, 3])
     return Ac
+# \\\ ------ ------------------------------------------- -------- ///
+
+
+# - A more efficient contraction for `block` functions
+# - they just call the corresponding `block2ten` functions
+def zblock(A, pxc, pyc, px, py, comm=None):
+    Aout = zblock2ten(
+        A, A.transpose([0, 1, 2, 3, 5, 4]).conj(),
+        pxc, pyc, px, py, comm
+    )
+    return Aout
+
+
+def yblock(Az, pzc, pxc, pz, px, comm=None):
+    Aout = yblock2ten(
+        Az, Az.transpose([0, 1, 3, 2, 4, 5]).conj(),
+        pzc, pxc, pz, px, comm
+    )
+    return Aout
+
+
+def xblock(Azy, pyc, pzc, py, pz, comm=None):
+    Aout = xblock2ten(
+        Azy, Azy.transpose([1, 0, 2, 3, 4, 5]).conj(),
+        pyc, pzc, py, pz, comm
+    )
+    return Aout
 
 
 # III. Full block-tensor transformation
