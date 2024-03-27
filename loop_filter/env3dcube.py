@@ -26,6 +26,7 @@ Order of the tensor leg is A[x, x', y, y', z, z']
 _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 """
 from ncon import ncon
+from .. import u1ten
 
 # I. For constructing <ψ|ψ> and absorbing sx, sz matrices
 
@@ -79,7 +80,7 @@ def contrInLeg(A, B):
     return dbA
 
 
-def contrx(dbA, dbB):
+def contrx(dbA, dbB, leg1=None, leg2=None, comm=None):
     """contract (dbA, dbB) pair in x direction
 
     Args:
@@ -89,13 +90,21 @@ def contrx(dbA, dbB):
     Returns:
         quadrA (TensorCommon): an 8-leg tensor
     """
-    quadrA = ncon([dbA, dbB],
-                  [[-1, -2, -5, -6, 1, 2],
-                   [-3, -4, -7, -8, 1, 2]])
+    if comm is None:
+        quadrA = ncon([dbA, dbB],
+                      [[-1, -2, -5, -6, 1, 2],
+                       [-3, -4, -7, -8, 1, 2]])
+    else:
+        # parallelization codes
+        dbAi = u1ten.fixleg(dbA, 3, leg1)
+        dbBj = u1ten.fixleg(dbB, 3, leg2)
+        quadrA = ncon([dbAi, dbBj],
+                      [[-1, -2, -5, 1, 2],
+                       [-3, -4, -6, 1, 2]])
     return quadrA
 
 
-def contrz(quadrA, quadrB):
+def contrz(quadrA, quadrB, comm=None):
     """contract (quadrA, quadrB) pair in z direction
 
     Args:
@@ -106,9 +115,15 @@ def contrz(quadrA, quadrB):
         octuA (TensorCommon): 8-leg tensor
 
     """
-    octuA = ncon([quadrA, quadrB],
-                 [[-1, -2, -3, -4, 1, 2, 3, 4],
-                  [-5, -6, -7, -8, 1, 2, 3, 4]])
+    if comm is None:
+        octuA = ncon([quadrA, quadrB],
+                     [[-1, -2, -3, -4, 1, 2, 3, 4],
+                      [-5, -6, -7, -8, 1, 2, 3, 4]])
+    else:
+        # parallelization codes
+        octuA = ncon([quadrA, quadrB],
+                     [[-1, -2, -3, -4, 1, 2],
+                      [-5, -6, -7, -8, 1, 2]])
     return octuA
 
 
@@ -226,7 +241,7 @@ def octu2gm(octuA, sy):
 
 
 # IV. Combine the above functions to construct P and γ
-def dbA2P(dbAp, sy):
+def dbA2P_old(dbAp, sy):
     """Build P from doubleA tensor and sy matrix
     This is simple a combination of functions in Parts I--III
 
@@ -256,7 +271,7 @@ def dbA2P(dbAp, sy):
     return Psy
 
 
-def dbA2gm(dbAgm, sy):
+def dbA2gm_old(dbAgm, sy):
     """Build γ from doubleA tensor and sy matrix
     This is simple a combination of functions in Parts I--III
 
@@ -282,5 +297,87 @@ def dbA2gm(dbAgm, sy):
     octuAgm = contrz(quadrAgm, quadrAgmy.conj())
     # Cost is χ^4 χs^6
     # For chi=[6,6], chis=[3,3], it takes about 0.06 seconds (CPU times)
+    Gamma = octu2gm(octuAgm, sy)
+    return Gamma
+
+
+def dbA2octu(dbA, dbAy, comm=None):
+    if comm is None:
+        # Cost is χ^6 χs^4
+        quadrA = contrx(dbA, dbAy.conj())
+        # Cost is χ^6 χs^4 (it is faster than absorbing sy into `quadrAp`)
+        quadrAy = contrx(dbAy, dbAy.conj())
+        # Cost is χ^7 χs^5 <-- bottleneck of the computational cost
+        octuA = contrz(quadrA, quadrAy.conj())
+    else:
+        # parallelization codes start
+        # 0. broadcast the input tensors
+        dbA = comm.bcast(dbA, root=0)
+        dbAy = comm.bcast(dbAy, root=0)
+        # 1. initialize the output tensor after contraction
+        octuA = 0
+        # 2. determine the job of each process
+        rank = comm.Get_rank()   # rank of current process
+        size = comm.Get_size()   # size of process
+        jobind = 0               # indicator of the job in the for loop
+        for i in u1ten.loopleg(dbA, 3):
+            for j in u1ten.loopleg(dbA, 3):
+                # parallelization process: χ^2 or χs^2
+                # check whether the job belongs to current process
+                if jobind % size != rank:
+                    jobind += 1
+                    continue
+                # Cost is χ^4 χs^4
+                quadrAij = contrx(
+                    dbA, dbAy.conj(), leg1=i, leg2=j, comm=comm
+                )
+                # Cost is χ^4 χs^4
+                quadrAyij = contrx(
+                    dbAy, dbAy.conj(), leg1=i, leg2=j, comm=comm
+                )
+                # Cost is χ^5 χs^5 <-- bottleneck of the computational cost
+                octuA += contrz(quadrAij, quadrAyij.conj(), comm=comm)
+                # increase the job indicator for parallel computation
+                jobind += 1
+        # 3. collective reducing sum operation
+        octuA = comm.allreduce(octuA)
+        # parallelization codes end
+    return octuA
+
+
+def dbA2P(dbAp, sy, comm=None):
+    """Build P from doubleA tensor and sy matrix
+    This is simple a combination of functions in Parts I--III
+
+    Args:
+        dbAp (TensorCommon): 6-leg tensor
+        sy (TensorCommon): 2-leg tensor
+
+    Returns:
+        P (TensorCommon): 2-leg tensor
+
+    """
+    # Cost is χ^4 χs^3
+    dbApy = syOn1Leg(dbAp, sy)
+    octuAp = dbA2octu(dbAp, dbApy, comm=comm)
+    Psy = octu2P(octuAp, sy)
+    return Psy
+
+
+def dbA2gm(dbAgm, sy, comm=None):
+    """Build γ from doubleA tensor and sy matrix
+    This is simple a combination of functions in Parts I--III
+
+    Args:
+        dbAgm (TensorCommon): 6-leg tensor
+        sy (TensorCommon): 2-leg tensor
+
+    Returns:
+        Gamma (TensorCommon): 4-leg tensor
+
+    """
+    # Cost is χ^2 χs^5
+    dbAgmy = syOn2Leg(dbAgm, sy)
+    octuAgm = dbA2octu(dbAgm, dbAgmy, comm=comm)
     Gamma = octu2gm(octuAgm, sy)
     return Gamma

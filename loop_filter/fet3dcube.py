@@ -22,9 +22,31 @@ Most environments are construction in `./env3dcube.py`
 Some useful functions in `./env3d.py` and `./fet3d.py` are called
 """
 from . import env3dcube, env3d, fet3d
+from ncon import ncon
 
 
 # I. For initialization of s matrix
+def cubeGamma(A, direction="y", comm=None):
+    """
+    Almost the same as `cubeGammas`, except
+    all s matrices are identity
+    """
+    # rotate A and permute sx, sy, sz
+    # according to the direction
+    (Ap, sxp, syp, szp) = env3d.cubePermute(
+         A, 1, 1, 1,
+         direction
+    )
+    dbA = env3dcube.contrInLeg(Ap, Ap.conj())
+    octuA = env3dcube.dbA2octu(dbA, dbA, comm=comm)
+    Gammasy = ncon(
+        [octuA, octuA.conj()],
+        [[-3, -1, 1, 2, 3, 4, 5, 6],
+         [-4, -2, 1, 2, 3, 4, 5, 6]]
+    )
+    return Gammasy
+
+
 def init_s_gilt(Gamma, chis, chienv, epsilon_init,
                 init_soft=False):
     """
