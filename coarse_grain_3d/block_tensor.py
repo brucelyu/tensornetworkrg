@@ -19,6 +19,7 @@ from ncon import ncon
 import numpy as np
 from .hotrg import zCollapseXproj
 from . import signfix as sf
+from .. import u1ten
 
 
 # I. For determing isometric tensors
@@ -198,7 +199,45 @@ def zblock2ten(A, B, pxc, pyc, px, py, comm=None):
                     ])
     else:
         # parallelization codes
-        pass
+        # 0. broadcase the input tensors
+        A = comm.bcast(A, root=0)
+        B = comm.bcast(B, root=0)
+        pxc = comm.bcast(pxc, root=0)
+        pyc = comm.bcast(pyc, root=0)
+        px = comm.bcast(px, root=0)
+        py = comm.bcast(py, root=0)
+        # 1. initialize the output tensor after contraction
+        Aout = 0  # for idle process, the contribution is 0
+        # 2. determine the job of each process
+        rank = comm.Get_rank()   # rank of current process
+        size = comm.Get_size()   # size of process
+        jobind = 0               # indicator of the job in the for loop
+        for i in u1ten.loopleg(A, 3):
+            for j in u1ten.loopleg(B, 1):
+                # parallelization process: χ^2
+                # check whether the job belongs to current process
+                if jobind % size != rank:
+                    jobind += 1
+                    continue
+                # fix legs to i
+                Ai = u1ten.fixleg(A, 3, i)
+                pyi = u1ten.fixleg(py, 0, i)
+                # fix legs to j
+                Bj = u1ten.fixleg(B, 1, j)
+                pxj = u1ten.fixleg(px, 1, j)
+                # The following contraction has
+                # CPU cost: χs^4 χ^3 χm^2
+                # Mem cost: χs^2 χm^2 χi^2
+                Aout += ncon([Ai, Bj, pxc, pyc, pxj, pyi],
+                             [
+                                 [1, 6, 2, -5, 3], [4, 5, 9, 3, -6],
+                                 [1, 4, -1], [2, 5, -3], [6, -2], [9, -4]
+                             ])
+                # increase the job indicator for parallel computation
+                jobind += 1
+        # 3. collective reducing sum operation
+        Aout = comm.allreduce(Aout)
+        # parallelization codes end
     return Aout
 
 
@@ -215,7 +254,46 @@ def yblock2ten(A, B, pzc, pxc, pz, px, comm=None):
                     ])
     else:
         # parallelization codes
-        pass
+        # 0. broadcase the input tensors
+        A = comm.bcast(A, root=0)
+        B = comm.bcast(B, root=0)
+        pzc = comm.bcast(pzc, root=0)
+        pxc = comm.bcast(pxc, root=0)
+        pz = comm.bcast(pz, root=0)
+        px = comm.bcast(px, root=0)
+        # 1. initialize the output tensor after contraction
+        Aout = 0  # for idle process, the contribution is 0
+        # 2. determine the job of each process
+        rank = comm.Get_rank()   # rank of current process
+        size = comm.Get_size()   # size of process
+        jobind = 0               # indicator of the job in the for loop
+        for i in u1ten.loopleg(A, 1):
+            for j in u1ten.loopleg(B, 1):
+                # parallelization process: χi^2
+                # check whether the job belongs to current process
+                if jobind % size != rank:
+                    jobind += 1
+                    continue
+                # fix legs to i
+                Ai = u1ten.fixleg(A, 1, i)
+                pxi = u1ten.fixleg(px, 0, i)
+                # fix legs to j
+                Bj = u1ten.fixleg(B, 1, j)
+                pxij = u1ten.fixleg(pxi, 0, j)
+                # The following contraction has
+                # CPU cost: χs^5 χ^1 χm^2 χi
+                # Mem cost: χs^4 χm^2 χi^1 + χ^1 χs^2 χm^2 χii^1
+                Aout += ncon([Ai, Bj, pzc, pxc, pz, pxij],
+                             [
+                                 [7, -3, 4, 1, 2], [3, 4, -4, 5, 6],
+                                 [1, 5, -5], [7, 3, -1], [2, 6, -6], [-2]
+                             ])
+                # increase the job indicator for parallel computation
+                jobind += 1
+
+        # 3. collective reducing sum operation
+        Aout = comm.allreduce(Aout)
+        # parallelization codes end
     return Aout
 
 
@@ -232,7 +310,42 @@ def xblock2ten(A, B, pyc, pzc, py, pz, comm=None):
                     ])
     else:
         # parallelization codes
-        pass
+        # 0. broadcase the input tensors
+        A = comm.bcast(A, root=0)
+        B = comm.bcast(B, root=0)
+        pyc = comm.bcast(pyc, root=0)
+        pzc = comm.bcast(pzc, root=0)
+        py = comm.bcast(py, root=0)
+        pz = comm.bcast(pz, root=0)
+        # 1. initialize the output tensor after contraction
+        Aout = 0  # for idle process, the contribution is 0
+        # 2. determine the job of each process
+        rank = comm.Get_rank()   # rank of current process
+        size = comm.Get_size()   # size of process
+        jobind = 0               # indicator of the job in the for loop
+        for i in u1ten.loopleg(A, 1):
+            # parallelization process: χii
+            # check whether the job belongs to current process
+            if jobind % size != rank:
+                jobind += 1
+                continue
+            # fix legs to i
+            Ai = u1ten.fixleg(A, 1, i)
+            Bi = u1ten.fixleg(B, 0, i)
+            # The following contraction has
+            # CPU cost: χ^6 χMs^4
+            # Mem cost: χ^3 χMs^4 + χ^6
+            Aout += ncon([Ai, Bi, pyc, pzc, py, pz],
+                         [
+                             [-1, 1, 2, 6, 7], [-2, 8, 9, 3, 4],
+                             [1, 8, -3], [6, 3, -5], [2, 9, -4], [7, 4, -6]
+                         ])
+            # increase the job indicator for parallel computation
+            jobind += 1
+
+        # 3. collective reducing sum operation
+        Aout = comm.allreduce(Aout)
+        # parallelization codes end
     return Aout
 
 
