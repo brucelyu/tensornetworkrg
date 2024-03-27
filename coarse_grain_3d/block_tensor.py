@@ -415,7 +415,7 @@ def xblock(Azy, pyc, pzc, py, pz, comm=None):
 # III. Full block-tensor transformation
 def blockrg(A, chi, chiM, chiI, chiII,
             cg_eps=1e-10, display=True,
-            chiSet=None):
+            chiSet=None, comm=None):
     """tensor coarse grain
 
     Args:
@@ -440,7 +440,8 @@ def blockrg(A, chi, chiM, chiI, chiII,
                               cg_eps=cg_eps)
     pmx, pix, pmy, piy = zpjs
     A = zblock(
-        A, pmx.conj(), pmy.conj(), pix, piy
+        A, pmx.conj(), pmy.conj(), pix, piy,
+        comm=comm
     )
     # I.2 y direction
     ypjs, yerrs, yds = yfindp(A, chi, chiM, chiII,
@@ -448,7 +449,8 @@ def blockrg(A, chi, chiM, chiI, chiII,
                               chiSet=chiSet)
     pmz, pox, piix = ypjs
     A = yblock(
-        A, pmz.conj(), pox.conj(), pmz, piix
+        A, pmz.conj(), pox.conj(), pmz, piix,
+        comm=comm
     )
     # I.3 x direction
     xpjs, xerrs, xds = xfindp(A, chi,
@@ -456,7 +458,8 @@ def blockrg(A, chi, chiM, chiI, chiII,
                               chiSet=chiSet)
     poy, poz = xpjs
     A = xblock(
-        A, poy.conj(), poz.conj(), poy, poz
+        A, poy.conj(), poz.conj(), poy, poz,
+        comm=comm
     )
     if display:
         print("Brief summary of block-tensor RG errors...")

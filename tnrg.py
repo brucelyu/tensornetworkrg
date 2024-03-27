@@ -829,7 +829,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
             xerrs, yerrs, zerrs
          ) = bkten3d.blockrg(
             Aold, chi, chiM, chiI, chiII,
-            cg_eps, display
+            cg_eps, display, comm=comm
         )
 
         # II. Sign fixing:
