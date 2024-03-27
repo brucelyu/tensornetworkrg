@@ -69,7 +69,7 @@ def init_s_gilt(Gamma, chis, chienv, epsilon_init,
 
 
 def init_alls(A, chis, chienv, epsilon,
-              cubeYZmore=False):
+              cubeYZmore=False, comm=None):
     """Initialization of s matrices in 3 directions
     The same as `.fet3d.init_alls`
 
@@ -78,10 +78,11 @@ def init_alls(A, chis, chienv, epsilon,
 
     """
     # Construct environments for initialization of s matrices
-    # all have cost O(χ^12)
-    Gammay = env3d.cubeGamma(A, direction="y")
-    Gammaz = env3d.cubeGamma(A, direction="z")
-    Gammax = env3d.cubeGamma(A, direction="x")
+    # all have cost O(χ^12) without parallelization
+    #               O(χ^10) with    parallelization
+    Gammay = cubeGamma(A, direction="y", comm=comm)
+    Gammaz = cubeGamma(A, direction="z", comm=comm)
+    Gammax = cubeGamma(A, direction="x", comm=comm)
     # find initial Lr and s
     if cubeYZmore:
         # truncating to χs-1
@@ -101,7 +102,8 @@ def init_alls(A, chis, chienv, epsilon,
 
 # II. For optimization of s matrix
 def opt_1s(dbAp, dbAgm, sold, PsiPsi,
-           epsilon=1e-10, iter_max=20):
+           epsilon=1e-10, iter_max=20,
+           comm=None):
     """
     This is the same as `.fet3d.opt_1s` function
     """
@@ -110,7 +112,8 @@ def opt_1s(dbAp, dbAgm, sold, PsiPsi,
     for k in range(iter_max):
         # update s matrix
         snew, errNew, errOld = optimize_single(
-            dbAp, dbAgm, snew, PsiPsi, epsilon
+            dbAp, dbAgm, snew, PsiPsi, epsilon,
+            comm=comm
         )
         # record FET error
         if k == 0:
@@ -126,7 +129,8 @@ def opt_1s(dbAp, dbAgm, sold, PsiPsi,
 
 def optimize_alls(
     A, sx, sy, sz, PsiPsi, epsilon=1e-10,
-    iter_max=20, n_round=2, display=True
+    iter_max=20, n_round=2, display=True,
+    comm=None
 ):
     """find sx, sy, sz to maximaize FET fidelity
     This is the same as `.fet3d.opt_alls` functions
@@ -145,7 +149,8 @@ def optimize_alls(
             dbAp = env3dcube.contrInLeg(Axz, Ap.conj())
             dbAgm = env3dcube.contrInLeg(Axz, Axz.conj())
             snew, err = opt_1s(
-                dbAp, dbAgm, syp, PsiPsi, epsilon, iter_max
+                dbAp, dbAgm, syp, PsiPsi, epsilon, iter_max,
+                comm=comm
             )
             # update s
             if leg == "y":
@@ -261,7 +266,8 @@ def optimize_alls_cycl(
     return sx, sy, sz, errList
 
 
-def optimize_single(dbAp, dbAgm, sold, PsiPsi, epsilon):
+def optimize_single(dbAp, dbAgm, sold, PsiPsi, epsilon,
+                    comm=None):
     """Optimize a single s matrix using `fet3d.updateMats`
     A trick (used in Evenbly's TNR implementation) is used
     to ensure the FET error is not increasing
@@ -287,8 +293,8 @@ def optimize_single(dbAp, dbAgm, sold, PsiPsi, epsilon):
 
     """
     # old FET error
-    Ps = env3dcube.dbA2P(dbAp, sold)
-    Gammas = env3dcube.dbA2gm(dbAgm, sold)
+    Ps = env3dcube.dbA2P(dbAp, sold, comm=comm)
+    Gammas = env3dcube.dbA2gm(dbAgm, sold, comm=comm)
     # calculate 1 - fidelity from P and γ environments
     errOld = fet3d.cubeFidelity(sold, Ps, Gammas, PsiPsi)[1]
     # no need for optimization if the error is already very small
@@ -303,8 +309,8 @@ def optimize_single(dbAp, dbAgm, sold, PsiPsi, epsilon):
     # (This idea is taken from Evenbly's TNR codes)
     for p in range(11):
         snew = (1 - 0.1*p) * stemp + 0.1 * p * sold
-        Pnew = env3dcube.dbA2P(dbAp, snew)
-        Gammanew = env3dcube.dbA2gm(dbAgm, snew)
+        Pnew = env3dcube.dbA2P(dbAp, snew, comm=comm)
+        Gammanew = env3dcube.dbA2gm(dbAgm, snew, comm=comm)
         # calculate 1 - fidelity from P and γ environments
         errNew = fet3d.cubeFidelity(snew, Pnew, Gammanew, PsiPsi)[1]
         # once the FET error reduces, we update s matrix
@@ -315,8 +321,11 @@ def optimize_single(dbAp, dbAgm, sold, PsiPsi, epsilon):
     return snew, errNew, errOld
 
 
-def fidelity(A, sx, sy, sz, PsiPsi):
-    Ps = env3d.cubePs(A, sx, sy, sz, direction="y")
-    Gammas = env3d.cubeGammas(A, sx, sy, sz, direction="y")
+def fidelity(A, sx, sy, sz, PsiPsi, comm=None):
+    Axz = env3dcube.sOnA(A, sx, sz)
+    dbAp = env3dcube.contrInLeg(Axz, A.conj())
+    dbAgm = env3dcube.contrInLeg(Axz, Axz.conj())
+    Ps = env3dcube.dbA2P(dbAp, sy, comm=comm)
+    Gammas = env3dcube.dbA2gm(dbAgm, sy, comm=comm)
     f, err, PhiPhi = fet3d.cubeFidelity(sy, Ps, Gammas, PsiPsi)
     return f, err, PhiPhi
