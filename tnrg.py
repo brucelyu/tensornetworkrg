@@ -1549,7 +1549,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
                  SPerrs
                  ) = self.ef2stp_blockrg(
                      tnrg_pars,
-                     signFix=gaugeFix)
+                     signFix=gaugeFix,
+                     comm=comm)
         return lferrs, SPerrs
 
     # II. linearized RG maps
