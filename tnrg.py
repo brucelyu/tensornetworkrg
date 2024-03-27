@@ -1105,7 +1105,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
                 sx, sy, sz,
                 Lrx, Lry, Lrz, Gammay
             ) = fet3dcube.init_alls(Aout, chis, chienv, epsilonCube,
-                                    cubeYZmore=cubeYZmore)
+                                    cubeYZmore=cubeYZmore, comm=comm)
             if display:
                 timing1 = datetime.now()
                 diffT = relativedelta(timing1, timing0)
@@ -1125,7 +1125,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
             # - Compute <ψ|ψ> for calculating initialization fidelity
             PsiPsiCube = ncon([Gammay], [[1, 1, 2, 2]])
             # - FET fidelity of inserting initial s matrices
-            err0Cube = fet3dcube.fidelity(Aout, sx, sy, sz, PsiPsiCube)[1]
+            err0Cube = fet3dcube.fidelity(Aout, sx, sy, sz, PsiPsiCube,
+                                          comm=comm)[1]
             # - Optimization of sx, sy, sz matrices
             if display:
                 timing0 = datetime.now()
@@ -1133,11 +1134,12 @@ class TensorNetworkRG3D(TensorNetworkRG):
                 sx, sy, sz, cubeErrList
              ) = fet3dcube.optimize_alls(
                  Aout, sx, sy, sz, PsiPsiCube, epsilon=cg_eps,
-                 iter_max=5, n_round=40, display=display
+                 iter_max=5, n_round=40, display=display,
+                 comm=comm
              )
             # - FET fidelity after optimization of s matrices
             (err1Cube, PhiPhi1) = fet3dcube.fidelity(
-                Aout, sx, sy, sz, PsiPsiCube)[1:]
+                Aout, sx, sy, sz, PsiPsiCube, comm=comm)[1:]
             if display:
                 timing1 = datetime.now()
                 diffT = relativedelta(timing1, timing0)
@@ -1195,7 +1197,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
         pmx, pix, pmy, piy = zpjs
         # (C.1)S2: Collapse two `A` tensor using isometric tensors
         Aout = bkten3d.zblock(
-            Aout, pmx.conj(), pmy.conj(), pix, piy
+            Aout, pmx.conj(), pmy.conj(), pix, piy,
+            comm=comm
         )
         if display:
             timing1 = datetime.now()
@@ -1313,7 +1316,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
         pmz, pox, piix = ypjs
         # (C.2) Step 2: Collapse two `A` tensor using isometric tensors
         Aout = bkten3d.yblock(
-            Aout, pmz.conj(), pox.conj(), pmz, piix
+            Aout, pmz.conj(), pox.conj(), pmz, piix,
+            comm=comm
         )
         if display:
             timing1 = datetime.now()
@@ -1422,7 +1426,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
         poy, poz = xpjs
         # (C.3) Step 2: Collapse two `A` tensor using isometric tensors
         Aout = bkten3d.xblock(
-            Aout, poy.conj(), poz.conj(), poy, poz
+            Aout, poy.conj(), poz.conj(), poy, poz,
+            comm=comm
         )
         if display:
             timing1 = datetime.now()
