@@ -69,7 +69,7 @@ def init_s_gilt(Gamma, chis, chienv, epsilon_init,
 
 
 def init_alls(A, chis, chienv, epsilon,
-              cubeYZmore=False, comm=None):
+              cubeYZmore=0, comm=None):
     """Initialization of s matrices in 3 directions
     The same as `.fet3d.init_alls`
 
@@ -85,10 +85,12 @@ def init_alls(A, chis, chienv, epsilon,
     Gammax = cubeGamma(A, direction="x", comm=comm)
     # find initial Lr and s
     if cubeYZmore:
-        # truncating to χs-1
-        sy, Lry = init_s_gilt(Gammay, chis-1, (chis-1)**2, epsilon,
+        # truncating to χs-cubeYZmore
+        sy, Lry = init_s_gilt(Gammay, chis-cubeYZmore,
+                              (chis-cubeYZmore)**2, epsilon,
                               init_soft=False)
-        sz, Lrz = init_s_gilt(Gammaz, chis-1, (chis-1)**2, epsilon,
+        sz, Lrz = init_s_gilt(Gammaz, chis-cubeYZmore,
+                              (chis-cubeYZmore)**2, epsilon,
                               init_soft=False)
     else:
         sy, Lry = init_s_gilt(Gammay, chis, chienv, epsilon,

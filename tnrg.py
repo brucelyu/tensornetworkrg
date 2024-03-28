@@ -987,7 +987,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
         # 0.3 Switch for two filtering steps
         cubeFilter = pars.get("cubeFilter", True)
         loopFilter = pars.get("loopFilter", True)
-        cubeYZmore = pars.get("cubeYZmore", False)
+        cubeYZmore = pars.get("cubeYZmore", 0)
         XloopF = pars.get("XloopF", False)
 
         if display:
@@ -1000,11 +1000,9 @@ class TensorNetworkRG3D(TensorNetworkRG):
             if display:
                 print("  >>~~~~X-Loop-Filter~~~~~~>>")
             # (E.0)S0: Set parameters for X-loop filtering
-            if cubeYZmore:
-                chiXs = int(np.ceil((pars["chi"] + pars["chis"]-1) / 2))
-                # chiXs = pars["chiMs"]
-            else:
-                chiXs = int(np.ceil((pars["chi"] + pars["chis"]) / 2))
+            # chiXs = int(np.ceil((pars["chi"] + 2 * (pars["chis"] - cubeYZmore)) / 3))
+            chiXs = int(np.ceil((pars["chi"] + pars["chis"] - cubeYZmore) / 2))
+            # chiXs = pars["chiMs"]
             chiXenv = chiXs**2
             epsilonX = pars["epsilon"]
 
