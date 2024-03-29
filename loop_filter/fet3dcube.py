@@ -38,12 +38,7 @@ def cubeGamma(A, direction="y", comm=None):
          direction
     )
     dbA = env3dcube.contrInLeg(Ap, Ap.conj())
-    octuA = env3dcube.dbA2octu(dbA, dbA, comm=comm)
-    Gammasy = ncon(
-        [octuA, octuA.conj()],
-        [[-3, -1, 1, 2, 3, 4, 5, 6],
-         [-4, -2, 1, 2, 3, 4, 5, 6]]
-    )
+    Gammasy = env3dcube.dbA2gm(dbA, None, comm=comm)
     return Gammasy
 
 
