@@ -51,7 +51,7 @@ def fullContr(A, cg_tens, comm=None,
     )
     # (E.2.1) Absorbing loop-filtering matrices
     # into x and y legs of z-collapsed tensor `Az`
-    if ver == "bistage" and loopFilter:
+    if ver == "bistage" and loopFilter and (mx is not None):
         Asz = fet3dloop.absb_mloopz(Asz, mx, my)
 
     # (C.2) y-direction collapse
@@ -60,7 +60,7 @@ def fullContr(A, cg_tens, comm=None,
     )
     # (E.2.2) Absorbing loop-filtering matrices
     # into z legs of y-collapsed tensor `Azy`
-    if ver == "bistage" and loopFilter:
+    if ver == "bistage" and loopFilter and (mz is not None):
         Aszy = fet3dloop.absb_mloopy(Aszy, mz)
 
     # (C.3) x-direction collapse
@@ -123,7 +123,7 @@ def linrgmap(dA, Astar_all, cg_tens,
         ) * c2sign[cZ]
     )
     # (E.2.1) Z-loop-filtering matrices linearization
-    if ver == "bistage" and loopFilter:
+    if ver == "bistage" and loopFilter and (mx is not None):
         dAsz = fet3dloop.absb_mloopz(dAsz, mx, my)
 
     # (C.2). y-direction linearization
@@ -138,7 +138,7 @@ def linrgmap(dA, Astar_all, cg_tens,
         ) * c2sign[cY]
     )
     # (E.2.2) Y-loop-filtering matrices linearization
-    if ver == "bistage" and loopFilter:
+    if ver == "bistage" and loopFilter and (mz is not None):
         dAszy = fet3dloop.absb_mloopy(dAszy, mz)
 
     # (C.3) x-direction linearization
