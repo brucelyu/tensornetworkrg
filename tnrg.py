@@ -1180,7 +1180,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
             if display:
                 print("  <<~~~~~~~~~~<<")
         else:
-            sx, sy, sz = [1 for k in range(3)]
+            sx, sy, sz = [None for k in range(3)]
             err0Cube, err1Cube = [0 for k in range(2)]
         # -----~~~<<
 
@@ -1299,7 +1299,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
             if display:
                 print("  <<~~~~~~~~~~<<")
         else:
-            mx, my = [1 for k in range(2)]
+            mx, my = [None for k in range(2)]
             err0LPZ, err1LPZ = [0 for k in range(2)]
         # -----~~~<<
 
@@ -1409,7 +1409,7 @@ class TensorNetworkRG3D(TensorNetworkRG):
             if display:
                 print("  <<~~~~~~~~~~<<")
         else:
-            mz = 1
+            mz = None
             err0LPY, err1LPY = [0 for k in range(2)]
         # -----~~~<<
 
