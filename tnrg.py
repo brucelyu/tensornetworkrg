@@ -192,9 +192,13 @@ class TensorNetworkRG:
         """
         # diagonalize the linearized RG map
         hyperOp = LinearOperator((dim_psiA,) * 2, matvec=linearRG)
+        # prepare the initial vector by applying the hyper-operator once
+        v0 = hyperOp.matvec(
+            np.random.rand(dim_psiA)
+        )
         eigVals = np.sort(
             abs(
-                eigs(hyperOp, k=N_scaleD,
+                eigs(hyperOp, k=N_scaleD, v0=v0,
                      which='LM', return_eigenvectors=False)
             )
         )
