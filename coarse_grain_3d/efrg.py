@@ -47,7 +47,8 @@ def fullContr(A, cg_tens, comm=None,
     # ------------------------------\
     # (C.1) z-direction collapse
     Asz = bkten3d.zblock(
-        As, pmx.conj(), pmy.conj(), pix, piy
+        As, pmx.conj(), pmy.conj(), pix, piy,
+        comm=comm
     )
     # (E.2.1) Absorbing loop-filtering matrices
     # into x and y legs of z-collapsed tensor `Az`
@@ -56,7 +57,8 @@ def fullContr(A, cg_tens, comm=None,
 
     # (C.2) y-direction collapse
     Aszy = bkten3d.yblock(
-        Asz, pmz.conj(), pox.conj(), pmz, piix
+        Asz, pmz.conj(), pox.conj(), pmz, piix,
+        comm=comm
     )
     # (E.2.2) Absorbing loop-filtering matrices
     # into z legs of y-collapsed tensor `Azy`
@@ -65,7 +67,8 @@ def fullContr(A, cg_tens, comm=None,
 
     # (C.3) x-direction collapse
     Aszyx = bkten3d.xblock(
-        Aszy, poy.conj(), poz.conj(), poy, poz
+        Aszy, poy.conj(), poz.conj(), poy, poz,
+        comm=comm
     )
     # ------------------------------/
     return A, As, Asz, Aszy, Aszyx
