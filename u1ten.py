@@ -64,8 +64,8 @@ def pinv(B, a=[0, 1], b=[2, 3], eps_mach=1e-10,
     else:
         # perform soft inversion
         dinv = invArray(d, softeps=eps_mach)
-    contrLegU = list(-np.array(a) - 1) + [1]
-    contrLegUh = list(-np.array(b) - 1) + [1]
+    contrLegU = (-np.array(a) - 1).tolist() + [1]
+    contrLegUh = (-np.array(b) - 1).tolist() + [1]
     Ud = U.multiply_diag(dinv, axis=len(U.shape) - 1, direction='r')
     Binv = ncon([Ud, U.conjugate()], [contrLegU, contrLegUh])
 
