@@ -845,28 +845,29 @@ def plotefrg(chi, lrerrsList, SPerrsList,
     SPplot = [[rgerr[1][1], rgerr[2][0], rgerr[2][1],
                rgerr[0][0], rgerr[0][2], rgerr[1][0]] for rgerr in SPerrsList]
     SPplot = np.array(SPplot)
+    lrerrsList[0] = [0, 0]
     lrerr = np.array(lrerrsList)
-    plt.figure(figsize=(10, 8))
-    ax1 = plt.subplot(211)
+    fig, axs = plt.subplots(2, 1, figsize=(10, 8),
+                            gridspec_kw={'height_ratios': [3, 1]})
+    ax1 = axs[0]
     ax1.plot(SPplot[startn:endn, 0], "r+-", alpha=0.4, label="Outmost x")
     ax1.plot(SPplot[startn:endn, 1], "yx-", alpha=0.4, label="Outmost y")
     ax1.plot(SPplot[startn:endn, 2], "y+-", alpha=0.4, label="Outmost z")
     ax1.plot(SPplot[startn:endn, 3], "bx-", alpha=0.4, label="Intermed x")
     ax1.plot(SPplot[startn:endn, 4], "b+-", alpha=0.4, label="Intermed y")
     ax1.plot(SPplot[startn:endn, 5], "rx-", alpha=0.4, label="Intermed z")
-    plt.ylabel("RG errors")
-    plt.yscale("log")
-    plt.title(r"$\chi = ${:d} (baby-FET + block-tensor)".format(chi))
-    plt.legend()
-    ax2 = plt.subplot(212)
+    ax1.set_ylabel("RG errors")
+    ax1.set_yscale("log")
+    ax1.set_title(r"$\chi = ${:d} (cube EF + block-tensor)".format(chi))
+    ax1.legend()
+    ax2 = axs[1]
     ax2.plot(lrerr[startn:endn, 0], "g.--", alpha=0.4,
-             label="cube filtering (Initial)")
+             label="cube (Initial)")
     ax2.plot(lrerr[startn:endn, 1], "k.--", alpha=0.4,
-             label="cube filtering (After optimization)")
-    plt.ylabel("FET errors")
-    plt.yscale("log")
-    plt.ylim([1e-4, 1e-1])
-    plt.legend()
+             label="cube (Optimized)")
+    ax2.set_ylabel("EF errors")
+    ax2.set_yscale("log")
+    ax2.legend()
     plt.savefig(figFile, bbox_inches='tight',
                 dpi=300)
 
