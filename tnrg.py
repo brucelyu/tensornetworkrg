@@ -889,7 +889,8 @@ class TensorNetworkRG3D(TensorNetworkRG):
         (
             sx, sy, sz,
             Lrx, Lry, Lrz, Gammay
-        ) = fet3d.init_alls(Aout, chis, chienv, init_epsilon)
+        ) = fet3dcube.init_alls(Aout, chis, chienv, init_epsilon,
+                                comm=comm)
         if display:
             print("Shape of initial sx is {}.".format(sx.shape))
             print("Shape of initial sy is {}.".format(sy.shape))
@@ -897,22 +898,19 @@ class TensorNetworkRG3D(TensorNetworkRG):
         # compute <ψ|ψ> for calculating fidelity
         PsiPsi = ncon([Gammay], [[1, 1, 2, 2]])
         # FET fidelity of inserting initial s matrices
-        Ps = env3d.cubePs(Aout, sx, sy, sz, direction="y")
-        Gammas = env3d.cubeGammas(Aout, sx, sy, sz, direction="y")
-        errFET0 = fet3d.cubeFidelity(sy, Ps, Gammas, PsiPsi)[1]
+        errFET0 = fet3dcube.fidelity(Aout, sx, sy, sz, PsiPsi,
+                                     comm=comm)[1]
         # I.2 Optimization of sx, sy, sz matrices
-        # TODO: How to set the hyper-parameters in FET optimization?
-        # fetloopN = min(50, chi**2 // 2)
         (
             sx, sy, sz, fetErrList
-         ) = fet3d.opt_alls(Aout, sx, sy, sz, PsiPsi,
-                            epsilon=cg_eps,
-                            iter_max=5, n_round=40,
-                            display=display)
+         ) = fet3dcube.optimize_alls(
+             Aout, sx, sy, sz, PsiPsi, epsilon=cg_eps,
+             iter_max=5, n_round=40, display=display,
+             comm=comm
+         )
         # FET fidelity after optimization of s matrices
-        Ps = env3d.cubePs(Aout, sx, sy, sz, direction="y")
-        Gammas = env3d.cubeGammas(Aout, sx, sy, sz, direction="y")
-        errFET1, PhiPhi1 = fet3d.cubeFidelity(sy, Ps, Gammas, PsiPsi)[1:]
+        (errFET1, PhiPhi1) = fet3dcube.fidelity(
+            Aout, sx, sy, sz, PsiPsi, comm=comm)[1:]
         if display:
             print("  Initial FET error for insertion of",
                   "s matrices is {:.3e}".format(errFET0))
