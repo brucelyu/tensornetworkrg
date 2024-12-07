@@ -237,7 +237,8 @@ def zCollapseXproj(A, B, chi, cg_eps=1e-8,
                    chis=[i+1 for i in range(chi)], eps=cg_eps,
                    trunc_err_func=trunc_err_func,
                    return_rel_err=True,
-                   chiSet=chiSet)
+                   # chiSet=chiSet
+                   )
     if chiSet is not None:
         # when the bond dimension is specified in Z2 sectors,
         # need to recalculate the approximation error
