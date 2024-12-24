@@ -282,7 +282,7 @@ def tnrg3dIterate(tnrg3dCase, rg_n=10, scheme="hotrg3d", ver="base",
         # For 3D Ising class, the first RG step only truncate
         # the bond dimension to 6 for χ=7,8,9, due to
         # the intrinsic property of the initial tensor.
-        if k == 0:
+        if k == 0 and scheme == "efrg":
             # For the first RG step from χ: 2 --> 4 --> 16,
             # we always use the basic block-tensor RG
             # and fix the output χ=10 or 6
