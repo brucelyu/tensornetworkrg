@@ -28,7 +28,8 @@ class TensorNetworkRG:
     """
     Tensor network renormalization group
     """
-    model_choice = ("ising2d", "ising3d", "golden chain", "cdl2d")
+    model_choice = ("ising2d", "ising3d", "golden chain", "cdl2d",
+                    "hardsquare1NN")
     ising_models = ("ising2d", "ising3d")
 
     def __init__(self, model):

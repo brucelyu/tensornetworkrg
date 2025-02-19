@@ -13,7 +13,8 @@ from abeliantensors import Tensor
 import numpy as np
 from ncon import ncon
 
-MODEL_CHOICE = ("ising2d", "ising3d", "golden chain")
+MODEL_CHOICE = ("ising2d", "ising3d", "golden chain",
+                "hardsquare1NN")
 
 
 def initial_tensor(model, model_parameters, is_sym=False,
@@ -41,6 +42,9 @@ def initial_tensor(model, model_parameters, is_sym=False,
             res = ising_3d(beta, ext_h, is_sym)
     elif model == "golden chain":
         res = golden_chain(scheme=scheme)
+    elif model == "hardsquare1NN":
+        z = model_parameters["activity"]
+        res = hardDisk_sqlat1NN(z, scheme=scheme)
     return res
 
 
@@ -181,3 +185,55 @@ def golden_chain(scheme="simple"):
                                      axis=axis_n)
 
     return init_ten
+
+
+def hardDisk_sqlat1NN(z, scheme="IRF"):
+    """Hard-disk model on square lattice with 1NN interaction
+
+    Args:
+        z (float): activity
+            z = exp(μ), with μ the chemical potenntial
+
+    Kwargs:
+        scheme (str):
+            default is interaction-round-face method
+
+    Returns:
+        A (Tensor): a 4-leg tensor
+
+    """
+    if scheme == "IRF":
+        # The copydot tensor
+        # We put the activity z on this dot
+        c = Tensor.zeros([2, 2, 2, 2])
+        c[0, 0, 0, 0] = 1.0
+        c[1, 1, 1, 1] = z
+
+        # This interaction-around-a-face tensor
+        # encodes the hardcore constraint
+        b = Tensor.zeros([2, 2, 2, 2])
+        b[0, 0, 0, 0] = 1.0
+        b[1, 0, 0, 0] = 1.0
+        b[0, 1, 0, 0] = 1.0
+        b[0, 0, 1, 0] = 1.0
+        b[0, 0, 0, 1] = 1.0
+        b[1, 1, 0, 0] = 1.0
+        b[0, 0, 1, 1] = 1.0
+
+        # The initial tensor is a 2x2 block consisting of c and b tensors
+        A = ncon([c, b, b, c], [[-1, 1, -5, 3], [-2, 2, 3, -7],
+                                [1, -3, -6, 4], [2, -4, 4, -8]]
+                 )
+        A = A.join_indices((0, 1), (2, 3), (4, 5), (6, 7))
+
+        # The last value of the index corresponds to (1, 1) configuration
+        # which is forbidden by the harcore constraint encoded in b
+        # Therefore, we can throw it away since A[3, :, :, :] vanishes,
+        # similar for the other three legs
+        A = A[:3, :3, :3, :3]
+        # This tensor invariant under a simultaneous
+        # - pi-rotation
+        # - a SWAP gate acting on all legs
+    else:
+        pass
+    return A
