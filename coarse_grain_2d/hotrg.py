@@ -7,6 +7,16 @@
 # Last Modified By  : Xinliang(Bruce) Lyu <lyu@issp.u-tokyo.ac.jp>
 """
 Various 2D HOTRG implementations
+that exploiting lattice symmetry of the underlying model.
+Until Septebmer 2024, when I graduated from my PhD,
+we had explored
+1) lattice reflection
+2) lattice rotation
+
+Notice that this file does not implement the usual HOTRG
+without exploiting the symmetry.
+See another file `hotrg_grl.py` for a more general
+implementation of the HOTRG
 
 Tensor leg order convention is
 A[x, y, x', y']
