@@ -13,6 +13,7 @@ from abeliantensors import TensorZ2, Tensor
 from ncon import ncon
 from .initial_tensor import initial_tensor
 from .coarse_grain_2d import trg_evenbly, tnr_evenbly, hotrg
+from .coarse_grain_2d import hotrg_grl as hotrg2d
 from .coarse_grain_3d import hotrg as hotrg3d
 from .coarse_grain_3d import block_tensor as bkten3d
 from .coarse_grain_3d import efrg as efrg3d
@@ -367,6 +368,10 @@ class TensorNetworkRG2D(TensorNetworkRG):
         pars={"chi": 4, "dtol": 1e-16,
               "display": True}
     ):
+        """
+        This scheme exploits the lattice reflection symmetry
+        of the underlying model
+        """
         if self.iter_n == 0:
             self.boundary = "parallel"
         # read hotrg parameters
@@ -396,6 +401,39 @@ class TensorNetworkRG2D(TensorNetworkRG):
         lrerr = 0
         return lrerr, SPerrList
 
+    def hotrg_grl(
+        self,
+        pars={"chi": 4, "cg_eps": 1e-16,
+              "display": True}
+    ):
+        # read hotrg parameters
+        chi = pars["chi"]
+        cg_eps = pars["cg_eps"]
+        display = pars["display"]
+        # use hotrg to coarse-grain the tensor
+        ten_cur = self.get_tensor()
+        (self.current_tensor,
+         px, py, errx, erry
+         ) = hotrg2d.cgTen(
+             ten_cur, chi, cg_eps=cg_eps
+         )
+        if display:
+            print("///////////////////////////")
+            print("The HOTRG errors are")
+            print("Vertical:   {:.4e}".format(errx))
+            print("Horizontal: {:.4e}".format(erry))
+            print("===========================")
+
+        # pull out the tensor norm and save
+        ten_mag = self.pullout_magnitude()
+        self.save_tensor_magnitude(ten_mag)
+
+        # there is no entanglement filtering
+        lrerr = 0
+        # store the RG errors as a list
+        SPerrList = [errx, erry]
+        return lrerr, SPerrList
+
     def rgmap(self, tnrg_pars,
               scheme="fet-hotrg", ver="base"):
         """
@@ -419,9 +457,15 @@ class TensorNetworkRG2D(TensorNetworkRG):
                                     init_stable=False)
         elif scheme == "hotrg":
             if ver == "base":
+                # This HOTRG exploits the lattice reflection symmetry
                 (lferrs,
                  SPerrs
                  ) = self.hotrg(tnrg_pars)
+            elif ver == "general":
+                # This is the general HOTRG
+                (lferrs,
+                 SPerrs
+                 ) = self.hotrg_grl(tnrg_pars)
         elif scheme == "tnr":
             if ver == "base":
                 (lferrs,
