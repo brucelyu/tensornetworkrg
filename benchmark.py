@@ -80,7 +80,7 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
 
     # HOTRG
     elif scheme == "hotrg":
-        if ver == "base":
+        if ver == "base" or ver == "general":
             tnrg_pars = {"chi": chi, "dtol": dtol, "display": True}
     elif scheme == "tnr":
         chis = pars["chis"]

@@ -403,12 +403,14 @@ class TensorNetworkRG2D(TensorNetworkRG):
 
     def hotrg_grl(
         self,
-        pars={"chi": 4, "cg_eps": 1e-16,
+        pars={"chi": 4, "dtol": 1e-16,
               "display": True}
     ):
+        if self.iter_n == 0:
+            self.boundary = "parallel"
         # read hotrg parameters
         chi = pars["chi"]
-        cg_eps = pars["cg_eps"]
+        cg_eps = pars["dtol"]
         display = pars["display"]
         # use hotrg to coarse-grain the tensor
         ten_cur = self.get_tensor()
