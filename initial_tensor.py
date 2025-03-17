@@ -221,6 +221,7 @@ def hardDisk_sqlat1NN(z, scheme="IRF"):
         b[0, 0, 1, 1] = 1.0
 
         # The initial tensor is a 2x2 block consisting of c and b tensors
+        # The leg order is A[x, x', y, y']
         A = ncon([c, b, b, c], [[-1, 1, -5, 3], [-2, 2, 3, -7],
                                 [1, -3, -6, 4], [2, -4, 4, -8]]
                  )
@@ -234,6 +235,9 @@ def hardDisk_sqlat1NN(z, scheme="IRF"):
         # This tensor invariant under a simultaneous
         # - pi-rotation
         # - a SWAP gate acting on all legs
+
+        # rotate A[x, x', y, y'] to A[x, y, x', y']
+        A = A.transpose([0, 2, 1, 3])
     else:
         pass
     return A
