@@ -601,6 +601,24 @@ class TensorNetworkRG2D(TensorNetworkRG):
         )
         return vsym, hsym
 
+    def generate_tm(self, direction="y"):
+        # generate transfer matrix in x or y direction
+        assert direction in ["x", "y"]
+        ten_cur = self.get_tensor()
+        if direction == "x":
+            tm = ncon([ten_cur], [[-1, 1, -2, 1]])
+        elif direction == "y":
+            tm = ncon([ten_cur], [[1, -1, 1, -2]])
+        else:
+            raise ValueError("The direction should be among x or y")
+        return tm
+
+    def degIndX(self, direction="y"):
+        tm = self.generate_tm(direction=direction)
+        trsq = (tm.trace()).norm()**2
+        sqtr = (ncon([tm, tm], [[-1, 1], [1, -2]])).trace().norm()
+        return trsq / sqtr
+
 
 class TensorNetworkRG3D(TensorNetworkRG):
     """
