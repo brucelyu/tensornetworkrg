@@ -21,7 +21,7 @@ A[x, y, x', y']
 
 For tensors with complex values,
 the conjugate direction of the tensor is
-assumed to be [1, -1, 1, -1]
+assumed to be [1, 1, -1, -1]
 """
 
 import numpy as np
