@@ -34,7 +34,7 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
         Tc = (2 / np.log(1 + np.sqrt(2)))
         Tval = relT * Tc
         ising2d.set_model_parameters(Tval, h)
-    if scheme in ["fet-hotrg", "hotrg"]:
+    if scheme in ["fet-hotrg", "hotrg", "trg"]:
         init_dirs = [1, 1, -1, -1]
     elif scheme == "tnr":
         init_dirs = [1, 1, 1, 1]
@@ -99,6 +99,9 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
                 "disiter": iter_max,
                 "miniter": miniter, "convtol": convtol,
                 "is_display": True}
+    elif scheme == "trg":
+        if ver == "general":
+            tnrg_pars = {"chi": chi, "dtol": dtol, "display": True}
     else:
         raise NotImplementedError("Not implemented yet")
 

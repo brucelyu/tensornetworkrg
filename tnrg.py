@@ -14,6 +14,7 @@ from ncon import ncon
 from .initial_tensor import initial_tensor
 from .coarse_grain_2d import trg_evenbly, tnr_evenbly, hotrg
 from .coarse_grain_2d import hotrg_grl as hotrg2d
+from .coarse_grain_2d import trg as trg2d
 from .coarse_grain_3d import hotrg as hotrg3d
 from .coarse_grain_3d import block_tensor as bkten3d
 from .coarse_grain_3d import efrg as efrg3d
@@ -436,6 +437,59 @@ class TensorNetworkRG2D(TensorNetworkRG):
         SPerrList = [errx, erry]
         return lrerr, SPerrList
 
+    def trg_grl(
+        self,
+        pars={"chi": 4, "dtol": 1e-16,
+              "display": True}
+    ):
+        """
+        Levin and Nave's TRG; it is general.
+        Do it twice, so the rescaling factor is b=2
+        """
+        if self.iter_n == 0:
+            self.boundary = "parallel"
+        # read parameters for TRG
+        chi = pars["chi"]
+        cg_eps = pars["dtol"]
+        display = pars["display"]
+        # use TRG to coarse-grain the tensor twice
+        ten_cur = self.get_tensor()
+        # store the RG errors as a list
+        SPerrList = []
+        if display:
+            print("///////////////////////////")
+        for n in range(2):
+            # 1. Splitting
+            t1, t2, t3, t4, err1, err2 = trg2d.splitTen(
+                ten_cur, ten_cur, chi, cg_eps
+            )
+            SPerrList.append(err1)
+            SPerrList.append(err2)
+            if display:
+                print("TRG splitting...")
+                print("err1 = {:.2e}".format(err1))
+                print("err2 = {:.2e}".format(err2))
+            # 2. Contraction
+            ten_cur = trg2d.contr4pieces(t1, t2, t3, t4)
+            if display:
+                print("  TRG-{:d} done!".format(n+1))
+                print("------")
+        if display:
+            scur = self.singlular_spectrum()
+            print("The singular value spectrum of A is:")
+            print(scur[:20])
+            print("===========================")
+
+        # update the current tensor
+        self.current_tensor = ten_cur * 1.0
+        # pull out the tensor norm and save
+        ten_mag = self.pullout_magnitude()
+        self.save_tensor_magnitude(ten_mag)
+
+        # there is no entanglement filtering
+        lrerr = 0
+        return lrerr, SPerrList
+
     def rgmap(self, tnrg_pars,
               scheme="fet-hotrg", ver="base"):
         """
@@ -473,6 +527,11 @@ class TensorNetworkRG2D(TensorNetworkRG):
                 (lferrs,
                  SPerrs
                  ) = self.tnr(tnrg_pars)
+        elif scheme == "trg":
+            if ver == "general":
+                (lferrs,
+                 SPerrs
+                 ) = self.trg_grl(tnrg_pars)
         return lferrs, SPerrs
 
     def init_dw(self):

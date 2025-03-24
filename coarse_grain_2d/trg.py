@@ -38,8 +38,6 @@ def splitTen(A1, A2, chi, cg_eps=1e-8):
         chi (int): bond dimension
 
     Kwargs:
-        direction (str): direction of the splitting
-            choose in ["13", "24"]
         cg_eps (float):
             a numerical precision control for coarse graining process
             singular values that are smaller than it will
