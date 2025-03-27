@@ -197,11 +197,13 @@ def hardDisk_sqlat1NN(z, scheme="IRF"):
     Kwargs:
         scheme (str):
             default is interaction-round-face method
+            chose in ["IRF", "trg"]
 
     Returns:
         A (Tensor): a 4-leg tensor
 
     """
+    assert scheme in ["IRF", "trg"]
     if scheme == "IRF":
         # The copydot tensor
         # We put the activity z on this dot
@@ -238,6 +240,19 @@ def hardDisk_sqlat1NN(z, scheme="IRF"):
 
         # rotate A[x, x', y, y'] to A[x, y, x', y']
         A = A.transpose([0, 2, 1, 3])
-    else:
-        pass
+    elif scheme == "trg":
+        # The 3-leg copy dot tensor
+        c = Tensor.zeros([2, 2, 2])
+        c[0, 0, 0] = 1
+        c[1, 1, 1] = np.sqrt(z)
+        # The 1NN matrix
+        W = Tensor.zeros([2, 2])
+        W[0, 0] = 1
+        W[1, 0] = 1
+        W[0, 1] = 1
+        # This initial tensor has bond dimension 2
+        A = ncon([c, c, c, c, W, W, W, W], [
+            [2, 7, -1], [1, 5, -2], [3, 8, -3], [4, 6, -4],
+            [1, 2], [5, 8], [3, 4], [7, 6]
+        ])
     return A
