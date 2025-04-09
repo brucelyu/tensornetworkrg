@@ -59,7 +59,9 @@ def findProj(rho, chi, cg_eps=1e-8):
             regardless of χ
 
     Returns:
-        p (TensorCommon): 3-leg tensor
+        p (TensorCommon): 3-leg isometric tensor p[ij o]
+            The first two indices i,j are "in"
+            The last one o is "out"
         g (array): SWAP sign
         err (float): error for truncation
         eigv (TensorCommon): eigenvalues
@@ -83,14 +85,23 @@ def findProj(rho, chi, cg_eps=1e-8):
 
 def block4ten(A, p):
     """contraction of a 2x2 block of tensors
+    Although both the rotation and reflection symmetries are preserved here,
+    only the rotational symmetry is imposed by this map,
+    while the reflection symmetry isn't imposed!
 
     Args:
-        A (TODO): TODO
-        p (TODO): TODO
+        A (TensorCommon): 4-leg tensor with real values
+        p (TensorCommon): 3-leg isometric tensor p[ij o]
 
-    Returns: TODO
+    Returns:
+        Ap (TensorCommon): the coarse-grained tensor
 
     """
+    # The costs are 6χ^7 + χ^8
+    Ap = ncon([A, A, A, A,
+               p.conjugate(), p, p.conjugate(), p],
+              [[2, 4, 9, 1], [11, 7, 5, 9], [6, 8, 10, 5], [12, 3, 1, 10],
+               [2, 3, -1], [4, 11, -2], [6, 7, -3], [8, 12, -4]])
     return Ap
 
 
@@ -101,3 +112,5 @@ def trunc_err_func(eigv, chi):
     """
     res = np.sum(np.abs(eigv[chi:])) / np.sum(np.abs(eigv))
     return res
+
+# end of file
