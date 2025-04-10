@@ -38,6 +38,9 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
         init_dirs = [1, 1, -1, -1]
     elif scheme == "tnr":
         init_dirs = [1, 1, 1, 1]
+    elif scheme == "block":
+        if ver == "rotsym":
+            init_dirs = [1, -1, 1, -1]
     else:
         raise NotImplementedError("Not implemented yet")
     # generate initial tensor
@@ -101,6 +104,9 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
                 "is_display": True}
     elif scheme == "trg":
         if ver == "general":
+            tnrg_pars = {"chi": chi, "dtol": dtol, "display": True}
+    elif scheme == "block":
+        if ver == "rotsym":
             tnrg_pars = {"chi": chi, "dtol": dtol, "display": True}
     else:
         raise NotImplementedError("Not implemented yet")
