@@ -12,7 +12,7 @@ import numpy as np
 from abeliantensors import TensorZ2, Tensor
 from ncon import ncon
 from .initial_tensor import initial_tensor
-from .coarse_grain_2d import trg_evenbly, tnr_evenbly, hotrg
+from .coarse_grain_2d import trg_evenbly, tnr_evenbly, hotrg, block_rotsym
 from .coarse_grain_2d import hotrg_grl as hotrg2d
 from .coarse_grain_2d import trg as trg2d
 from .coarse_grain_3d import hotrg as hotrg3d
@@ -490,6 +490,64 @@ class TensorNetworkRG2D(TensorNetworkRG):
         lrerr = 0
         return lrerr, SPerrList
 
+    def bkten_rot(
+        self,
+        pars={"chi": 4, "dtol": 1e-16, "display": True}
+    ):
+        """
+        Entanglement Filtering RG that preseves two lattice symmetries
+        - reflection
+        - rotation
+        Furthermore, the RG map imposes the rotational symmetry
+        """
+        if self.iter_n == 0:
+            # In this scheme, a pair of two isometries
+            # has opposite arrow for input legs
+            self.init_dw()
+            self.boundary = "anti-parallel"
+
+        # read parameters for the block-tensor part
+        chi = pars["chi"]
+        cg_eps = pars["dtol"]
+        display = pars["display"]
+
+        # Do the tensor RG map
+        ten_cur = self.get_tensor()
+        if display:
+            print("///////////////////////////")
+        # Step 1. Determine isometric tensors
+        p, g, err, eigv = block_rotsym.findProj(
+            ten_cur, chi, cg_eps=cg_eps
+        )
+        # Step 2. Contraction of the 2x2 block
+        Aout = block_rotsym.block4ten(
+            ten_cur, p
+        )
+        # print out info
+        if display:
+            print("The block-tensor map errors are")
+            print("  - Error (out) = {:.2e}".format(err))
+            print("The singular value spectrum of A is:")
+            scur = self.singlular_spectrum()
+            print(scur[:20])
+            # Check the symmetry of the coarse-grained tensor
+            print("Check symmetry of the coarse-grained tensor:")
+            print("  - Reflection: {}".format(block_rotsym.isReflSym(Aout, g)))
+            print("  - Rotation  : {}".format(block_rotsym.isRotSym(Aout, g)))
+            print("===========================")
+        # update the current tensor
+        self.current_tensor = Aout * 1.0
+        # pull out the tensor norm and save
+        ten_mag = self.pullout_magnitude()
+        self.save_tensor_magnitude(ten_mag)
+        # save isometric tensors and SWAP signs
+        self.isometry_applied = [p, p.conj()]  # x and y directions
+        self.gSWAP = g * 1.0
+        # return errors
+        lrerr = 0    # no entanglement filtering error
+        SPerrs = [err, err]
+        return lrerr, SPerrs
+
     def rgmap(self, tnrg_pars,
               scheme="fet-hotrg", ver="base"):
         """
@@ -532,6 +590,11 @@ class TensorNetworkRG2D(TensorNetworkRG):
                 (lferrs,
                  SPerrs
                  ) = self.trg_grl(tnrg_pars)
+        elif scheme == "block":
+            if ver == "rotsym":
+                (lferrs,
+                 SPerrs
+                 ) = self.bkten_rot(tnrg_pars)
         return lferrs, SPerrs
 
     def init_dw(self):
@@ -664,6 +727,15 @@ class TensorNetworkRG2D(TensorNetworkRG):
         # generate transfer matrix in x or y direction
         assert direction in ["x", "y"]
         ten_cur = self.get_tensor()
+        if self.boundary == "anti-parallel":
+            # we need to take care of
+            # the gauge matrices on bonds
+            v, w = self.isometry_applied.copy()
+            Hgauge = ncon([v, v], [[1, 2, -1], [2, 1, -2]])
+            Vgauge = ncon([w, w], [[1, 2, -1], [2, 1, -2]])
+            ten_cur = ncon([ten_cur, Hgauge, Vgauge],
+                           [[1, 2, -3, -4], [1, -1], [2, -2]])
+        # construct the transfer matrix
         if direction == "x":
             tm = ncon([ten_cur], [[-1, 1, -2, 1]])
         elif direction == "y":
