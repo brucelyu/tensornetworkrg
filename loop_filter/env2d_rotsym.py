@@ -114,6 +114,27 @@ def dbA2UpsilonP(dbA, s):
     return Upsilon, P
 
 
+def plaqFidelity(s, P, Upsilon, PsiPsi):
+    """fidelity of the entanglement filtering
+
+    Args:
+        s (TensorCommon): the filtering matrix
+        P (TensorCommon): P environment for EF
+        Upsilon (TensorCommon): Upsilon environment for EF
+        PsiPsi (float): the overlap <ψ|ψ>
+
+    Returns: TODO
+
+    """
+    # <ψ|φ>
+    PsiPhi = ncon([P.conj(), s], [[1, 2], [1, 2]])
+    # <φ|φ>
+    PhiPhi = ncon([Upsilon, s.conj(), s],
+                  [[1, 2, 3, 4], [1, 2], [3, 4]])
+    # fidelity = |<ψ|φ>|^2 / (<φ|φ> <ψ|ψ>)
+    f = PsiPhi * PsiPhi.conj() / (PhiPhi * PsiPsi)
+    f = f.norm()
+    return f, 1 - f, PhiPhi
 
 
 # end of the file
