@@ -57,8 +57,6 @@ def init_s(A, chis, chienv, epsilon):
                  eps=epsilon)[0]
     # make the direction of s as [-1, 1]
     s = s.flip_dir(1)
-    # normalized s (for the subsequent optimzation)
-    s = s / s.norm()
     return s, Lr, Upsilon0, dbA
 
 
@@ -154,6 +152,9 @@ def opt_s(dbA, s_init, PsiPsi, epsilon=1e-10, iter_max=20,
     s = s_init * 1.0
     errs = []
     for k in range(iter_max):
+        if k == 0:
+            # normalized s
+            s = s / s.norm()
         # update s matrix
         s, errNew, errOld = update_s(dbA, s, PsiPsi, epsilon)
         # record evolution of errors
