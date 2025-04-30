@@ -103,7 +103,7 @@ def dbA2UpsilonP(dbA, s):
                  [[-1, 1, -3, -4], [1, -2]]
                  )
     # these two are for contructing tensor Upsilon
-    dbA2sb = ncon([[dbA1s, s.conj()]],
+    dbA2sb = ncon([dbA1s, s.conj()],
                   [[-1, -2, 1, -4], [1, -3]])
     dbA4s = ncon([dbA2sb, s, s.conj()],
                  [[1, 2, -3, -4], [1, -1], [2, -2]])
