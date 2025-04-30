@@ -19,7 +19,8 @@ from .coarse_grain_3d import hotrg as hotrg3d
 from .coarse_grain_3d import block_tensor as bkten3d
 from .coarse_grain_3d import efrg as efrg3d
 from .loop_filter import (
-    cleanLoop, toymodels, fet3d, env3d, fet3dcube, fet3dloop
+    cleanLoop, toymodels, fet3d, env3d, fet3dcube, fet3dloop,
+    fet2d_rotsym
 )
 from . import u1ten
 from datetime import datetime
@@ -546,6 +547,62 @@ class TensorNetworkRG2D(TensorNetworkRG):
         # return errors
         lrerr = 0    # no entanglement filtering error
         SPerrs = [err, err]
+        return lrerr, SPerrs
+
+    def efrg(
+        self,
+        pars={"chi": 6, "dtol": 1e-16, "display": True,
+              "chis": 4, "chienv": 16, "epsilon": 1e-8}
+    ):
+        if self.iter_n == 0:
+            # In this scheme, a pair of two isometries
+            # has opposite arrow for input legs
+            self.init_dw()
+            self.boundary = "anti-parallel"
+        # read parameters
+        chi = pars["chi"]
+        cg_eps = pars["dtol"]
+        display = pars["display"]
+        chis = pars["chis"]
+        chienv = pars["chienv"]
+        epsilon = pars["epsilon"]
+
+        # read the input tensor
+        Ain = self.get_tensor()
+
+        # I. Entanglement filtering (EF)
+        # I.1 Initialization of the filtering matrix
+        (
+            s, Lr, Upsilon0, dbA
+        ) = fet2d_rotsym.init_s(
+            Ain, chis, chienv, epsilon
+        )
+        if display:
+            print("Shape of s is {}.".format(s.shape))
+        # compute <ψ|ψ> for calculating fidelity
+        PsiPsi = ncon([Upsilon0], [[1, 1, 2, 2]])
+        # Fidelity (or error) of the EF
+        errEF0 = fet2d_rotsym.fidelity(
+            dbA, s, PsiPsi)[1]
+        # I.2 Update the s matrix to minimize the EF error
+        s, errsEF = fet2d_rotsym.opt_s(
+            dbA, s, PsiPsi, epsilon=cg_eps,
+            iter_max=200, display=True
+        )
+        # Fidelity (or error) of the EF after optimization
+        errEF1, PhiPhi1 = fet2d_rotsym.fidelity(
+            dbA, s, PsiPsi)[1:]
+        if display:
+            print("  Initial EF error is {:.3e}".format(errEF0))
+            print("    Final EF error is {:.3e}".format(errEF1))
+        # I.3 Take care the overall magnitude of s to
+        # make sure that <ψ|ψ> = <φ|φ>
+        PsiDivPhi = (PsiPsi / PhiPhi1).norm()
+        s = s * (PsiDivPhi)**(1/16)
+        # I.4 Act the filtering matrix s on the main tensor
+
+        # II. Block-tensor map
+
         return lrerr, SPerrs
 
     def rgmap(self, tnrg_pars,
