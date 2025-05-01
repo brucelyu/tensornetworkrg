@@ -197,4 +197,18 @@ def fidelity(dbA, s, PsiPsi):
     return f, err, PhiPhi
 
 
+# III. Apply the filtering matrix to the 4-leg tensor A
+def absorb(A, s):
+    """A absorbs the filtering matrix s
+
+    Args:
+        A (TensorCommon): 4-leg tensor
+        s (TensorCommon): filtering matrix
+
+    """
+    As = ncon([A, s, s.conj()],
+              [[1, 2, -3, -4], [1, -1], [2, -2]]
+              )
+    return As
+
 # end of the file
