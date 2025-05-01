@@ -592,6 +592,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
         # Fidelity (or error) of the EF after optimization
         errEF1, PhiPhi1 = fet2d_rotsym.fidelity(
             dbA, s, PsiPsi)[1:]
+        # print out info of the EF
         if display:
             print("  Initial EF error is {:.3e}".format(errEF0))
             print("    Final EF error is {:.3e}".format(errEF1))
@@ -599,9 +600,43 @@ class TensorNetworkRG2D(TensorNetworkRG):
         # make sure that <ψ|ψ> = <φ|φ>
         PsiDivPhi = (PsiPsi / PhiPhi1).norm()
         s = s * (PsiDivPhi)**(1/16)
-        # I.4 Act the filtering matrix s on the main tensor
+        # I.4 Act the filtering matrix s on the main tensor:
+        # Ain -- > As
+        As = fet2d_rotsym.absorb(Ain, s)
 
         # II. Block-tensor map
+        # II.1 Determine the isometric tensors
+        p, g, err, eigv = block_rotsym.findProj(
+            As, chi, cg_eps=cg_eps
+        )
+        # II.2 Contraction of the 2x2 block
+        Aout = block_rotsym.block4ten(
+            As, p
+        )
+        # print out info of the block-tensor map
+        if display:
+            print("The block-tensor map error is")
+            print("  - Error (out) = {:.2e}".format(err))
+            print("The singular value spectrum of A is:")
+            scur = self.singlular_spectrum()
+            print(scur[:20])
+            # Check the symmetry of the coarse-grained tensor
+            print("Check symmetry of the coarse-grained tensor:")
+            print("  - Reflection: {}".format(block_rotsym.isReflSym(Aout, g)))
+            print("  - Rotation  : {}".format(block_rotsym.isRotSym(Aout, g)))
+            print("===========================")
+
+        # III. update the current tensor
+        self.current_tensor = Aout * 1.0
+        # pull out the tensor norm and save
+        ten_mag = self.pullout_magnitude()
+        self.save_tensor_magnitude(ten_mag)
+        # save isometric tensors and SWAP signs
+        self.isometry_applied = [p, p.conj()]  # x and y directions
+        self.gSWAP = g * 1.0
+        # return errors
+        lrerr = [errEF0, errEF1]
+        SPerrs = [err, err]
 
         return lrerr, SPerrs
 
@@ -652,6 +687,11 @@ class TensorNetworkRG2D(TensorNetworkRG):
                 (lferrs,
                  SPerrs
                  ) = self.bkten_rot(tnrg_pars)
+        elif scheme == "efrg":
+            if ver == "rotsym":
+                (lferrs,
+                 SPerrs
+                 ) = self.efrg(tnrg_pars)
         return lferrs, SPerrs
 
     def init_dw(self):
