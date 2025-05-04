@@ -170,12 +170,12 @@ def opt_s(dbA, s_init, PsiPsi, epsilon=1e-10, iter_max=20,
         if errNew < epsilon:
             break
         # exit the iteration if the error converges
-        if k > 9 and k % 10 == 0:
+        if k > 49 and k % 50 == 0:
             if display:
                 print("EF Error (iter {:2d}) = {:.3e}".format(k, errs[-1]))
             isConverge = (
-                abs((errs[-1] - errs[-11]) / (errs[-11] + 1e-8)
-                    ) < 0.001
+                abs((errs[-1] - errs[-51]) / (errs[-51] + 1e-8)
+                    ) < 0.005
             )
             if isConverge:
                 break
