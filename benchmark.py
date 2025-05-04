@@ -38,7 +38,7 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
         init_dirs = [1, 1, -1, -1]
     elif scheme == "tnr":
         init_dirs = [1, 1, 1, 1]
-    elif scheme == "block":
+    elif scheme in ["block", "efrg"]:
         if ver == "rotsym":
             init_dirs = [1, -1, 1, -1]
     else:
@@ -108,6 +108,14 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
     elif scheme == "block":
         if ver == "rotsym":
             tnrg_pars = {"chi": chi, "dtol": dtol, "display": True}
+    elif scheme == "efrg":
+        chis = pars["chis"]
+        if ver == "rotsym":
+            print("The additional hyper-parameters are")
+            print("Entanglement-filtering squeezed bond dimension: ",
+                  "--{:d}--".format(chis))
+            tnrg_pars = {"chi": chi, "dtol": dtol, "display": True,
+                         "chis": chis, "chienv": chis**2, "epsilon": dtol}
     else:
         raise NotImplementedError("Not implemented yet")
 
@@ -124,6 +132,8 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
     outDir = pars["outDir"]
     if outDir is not None:
         fname = "{:s}-{:s}-chi{:d}.pkl".format(scheme, ver, chi)
+        if scheme == "efrg":
+            fname = "{:s}-{:s}-chi{:d}s{:d}.pkl".format(scheme, ver, chi, chis)
         saveData(outDir,
                  fname,
                  data=[chi, errFETList, errVList, errHList, gErrList]
