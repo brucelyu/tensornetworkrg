@@ -61,6 +61,7 @@ class TensorNetworkRG:
         self.tensor_magnitude = []
         self.isometry_applied = None
         self.exact_free_energy = 0
+        self.boundary = None
 
     # fetch instance properties #
     # ------------------------- #
