@@ -576,10 +576,13 @@ class TensorNetworkRG2D(TensorNetworkRG):
         (
             s, Lr, Upsilon0, dbA
         ) = fet2d_rotsym.init_s(
-            Ain, chis, chienv, epsilon
+            Ain, chis, chienv, epsilon, epsilon_inv=cg_eps
         )
         if display:
             print("Shape of s is {}.".format(s.shape))
+            print("Singular value of Lr is:")
+            s_Lr = Lr.svd([0], [1])[1]
+            print(s_Lr[:10])
         # compute <ψ|ψ> for calculating fidelity
         PsiPsi = ncon([Upsilon0], [[1, 1, 2, 2]])
         # Fidelity (or error) of the EF
@@ -618,10 +621,13 @@ class TensorNetworkRG2D(TensorNetworkRG):
         if display:
             print("The block-tensor map error is")
             print("  - Error (out) = {:.2e}".format(err))
-            print("The singular value spectrum of A is:")
+            print("The Projective Trunction spectrum is:")
+            print(eigv[:20] / eigv[0])
+            print("The singular value spectrum of A is (diagonal SVD):")
             scur = self.singlular_spectrum()
             print(scur[:20])
             # Check the symmetry of the coarse-grained tensor
+            print()
             print("Check symmetry of the coarse-grained tensor:")
             print("  - Reflection: {}".format(block_rotsym.isReflSym(Aout, g)))
             print("  - Rotation  : {}".format(block_rotsym.isRotSym(Aout, g)))
