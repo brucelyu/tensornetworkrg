@@ -25,7 +25,7 @@ from ncon import ncon
 
 
 # I. For the initialization of the filtering matrix s
-def init_s(A, chis, chienv, epsilon):
+def init_s(A, chis, chienv, epsilon, epsilon_inv=1e-10):
     """Initialization of the filtering matrix s
 
     Args:
@@ -48,7 +48,7 @@ def init_s(A, chis, chienv, epsilon):
     # Step 1. Take the Moore-Penrose inverse of the Upsilon tensor
     Upsilon0_pinv = u1ten.pinv(
         Upsilon0, [0, 1], [2, 3],
-        eps_mach=epsilon, chiCut=chienv
+        eps_mach=epsilon_inv, chiCut=chienv
     )
     # Step 2. Obtain the low-rank matrix Lr
     Lr = ncon([Upsilon0_pinv, Upsilon0], [[-1, -2, 1, 2], [1, 2, 3, 3]])
