@@ -12,7 +12,7 @@ import numpy as np
 from abeliantensors import TensorZ2, Tensor
 from ncon import ncon
 from .initial_tensor import initial_tensor
-from .coarse_grain_2d import trg_evenbly, tnr_evenbly, hotrg, block_rotsym
+from .coarse_grain_2d import trg_evenbly, tnr_evenbly, hotrg, block_rotsym, block_grl
 from .coarse_grain_2d import hotrg_grl as hotrg2d
 from .coarse_grain_2d import trg as trg2d
 from .coarse_grain_3d import hotrg as hotrg3d
@@ -492,12 +492,64 @@ class TensorNetworkRG2D(TensorNetworkRG):
         lrerr = 0
         return lrerr, SPerrList
 
+    def block_grl(
+            self,
+            pars={"chi": 4, "dtol": 1e-16, "display": True}
+    ):
+        """
+        The general block-tensor map.
+        No lattice symmetry is exploited in this scheme
+        """
+        if self.iter_n == 0:
+            self.boundary = "parallel"
+
+        # read parameters for the block-tensor part
+        chi = pars["chi"]
+        cg_eps = pars["dtol"]
+        display = pars["display"]
+
+        # Do the tensor RG map
+        ten_cur = self.get_tensor()
+        if display:
+            print("///////////////////////////")
+        # Apply the block-tensor map
+        ten_cur = self.get_tensor()
+        (self.current_tensor,
+         px, py, errx, erry, eigvx, eigvy
+         ) = block_grl.cgTen(
+             ten_cur, chi, cg_eps=cg_eps
+         )
+
+        # print out info
+        if display:
+            print("The block-tensor map errors are (they should be the same)")
+            print("  - x-dir = {:.2e}".format(errx))
+            print("  - y-dir = {:.2e}".format(erry))
+            print("-------")
+            print("The singular value spectrum of A is:")
+            scur = self.singlular_spectrum()
+            print(scur[:20])
+            print("-------")
+            print("The Projective Trunction spectrum is:")
+            print(eigvx[:20] / eigvx[0])
+            print("-------")
+
+        # pull out the tensor norm and save
+        ten_mag = self.pullout_magnitude()
+        self.save_tensor_magnitude(ten_mag)
+
+        # there is no entanglement filtering
+        lrerr = 0
+        # store the RG errors as a list
+        SPerrList = [errx, erry]
+        return lrerr, SPerrList
+
     def bkten_rot(
         self,
         pars={"chi": 4, "dtol": 1e-16, "display": True}
     ):
         """
-        Entanglement Filtering RG that preseves two lattice symmetries
+        Block-tensor RG that preseves two lattice symmetries
         - reflection
         - rotation
         Furthermore, the RG map imposes the rotational symmetry
@@ -529,9 +581,14 @@ class TensorNetworkRG2D(TensorNetworkRG):
         if display:
             print("The block-tensor map errors are")
             print("  - Error (out) = {:.2e}".format(err))
+            print("-------")
             print("The singular value spectrum of A is:")
             scur = self.singlular_spectrum()
             print(scur[:20])
+            print("-------")
+            print("The Projective Trunction spectrum is:")
+            print(eigv[:20] / eigv[0])
+            print("-------")
             # Check the symmetry of the coarse-grained tensor
             print("Check symmetry of the coarse-grained tensor:")
             print("  - Reflection: {}".format(block_rotsym.isReflSym(Aout, g)))
@@ -694,6 +751,11 @@ class TensorNetworkRG2D(TensorNetworkRG):
                 (lferrs,
                  SPerrs
                  ) = self.bkten_rot(tnrg_pars)
+            elif ver == "general":
+                # This is the genearl block-tensor map
+                (lferrs,
+                 SPerrs
+                 ) = self.block_grl(tnrg_pars)
         elif scheme == "efrg":
             if ver == "rotsym":
                 (lferrs,
