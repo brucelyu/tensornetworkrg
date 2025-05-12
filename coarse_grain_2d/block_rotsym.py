@@ -68,22 +68,30 @@ def findProj(A, chi, cg_eps=1e-8):
 
     """
     # simontaneously diagonalize rho and the SWAP matrix
-    # since SWAP @ rho = rho @ SWAP.
-    # SWAP @ rho[ij mn] = rho[ji mn]
-    # Eigenvalues are the multiplication of the two
-    # (The second pair is [3, 2] instead of [2, 3] due to SWAP)
+    # since SWAP @ ρ = ρ @ SWAP,
+    # where SWAP @ ρ[ij mn] = ρ[ji mn].
+    # Our trick here is to diagonalize SWAP * ε + ρ,
+    # where ε is a small number that doesn't change
+    # the order of eigenvalues of ρ
     rho = densityM(A)
-    eigv, p, err = rho.eig(
-        [0, 1], [3, 2],
+    # construct the SWAP matrix
+    eyeMat = rho.eye(rho.shape[0])
+    # Take care of the conj dir for abeliantensors
+    if eyeMat.dirs is not None:
+        eyeMat.dirs = [1, 1]
+    SWAP = ncon([eyeMat, eyeMat.conj()], [[-1, -4], [-2, -3]])
+    # perturb the density matrix ρ
+    rhoP = rho + SWAP * cg_eps * 1e-2
+    eigv, p, err = rhoP.eig(
+        [0, 1], [2, 3], hermitian=True,
         chis=[i+1 for i in range(chi)], eps=cg_eps,
         trunc_err_func=trunc_err_func,
         return_rel_err=True
     )
-    # all eigenvectors and eigenvalues are real
-    eigv = eigv.real()
-    p = p.real()
+
     # calculate the SWAP eigenvalues
-    g = eigv.sign()
+    g = ncon([p.conj(), p.conj()], [[1, 2, -1], [2, 1, -2]])
+    g = g.diag()
     return p, g, err, eigv.abs()
 
 
