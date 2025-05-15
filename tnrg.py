@@ -648,7 +648,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
         # I.2 Update the s matrix to minimize the EF error
         s, errsEF = fet2d_rotsym.opt_s(
             dbA, s, PsiPsi, epsilon=cg_eps,
-            iter_max=600, display=True
+            iter_max=600, display=display
         )
         # Fidelity (or error) of the EF after optimization
         errEF1, PhiPhi1 = fet2d_rotsym.fidelity(
