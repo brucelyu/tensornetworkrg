@@ -805,6 +805,12 @@ class TensorNetworkRG2D(TensorNetworkRG):
                           ] for k in range(aspect_ratio)
                          ]
         ten_cur = self.get_tensor()
+        if self.boundary == "anti-parallel" and self.iter_n > 0:
+            v, w = self.isometry_applied.copy()
+            Hgauge = ncon([v, v], [[1, 2, -1], [2, 1, -2]])
+            Vgauge = ncon([w, w], [[1, 2, -1], [2, 1, -2]])
+            ten_cur = ncon([ten_cur, Hgauge, Vgauge],
+                           [[1, 2, -3, -4], [1, -1], [2, -2]])
         ten_mag = self.get_tensor_magnitude()[-1]
         ten_inv = ten_mag**(-1/3) * ten_cur
         transfer_mat = ncon([ten_inv]*aspect_ratio,
