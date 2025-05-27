@@ -243,10 +243,18 @@ def hardDisk_sqlat1NN(z, scheme="IRF"):
     elif scheme == "trg":
         # The 3-leg copy dot tensor
         c = Tensor.zeros([2, 2, 2])
-        c[0, 0, 0] = 1
-        c[1, 1, 1] = np.sqrt(z)
         # The 1NN matrix
         W = Tensor.zeros([2, 2])
+        # For negative activity, the tensor is complex
+        if z < 0:
+            c = Tensor.zeros([2, 2, 2], dtype=np.complex128)
+            W = Tensor.zeros([2, 2], dtype=np.complex128)
+
+        c[0, 0, 0] = 1
+        if z >= 0:
+            c[1, 1, 1] = np.sqrt(z)
+        else:
+            c[1, 1, 1] = np.sqrt(z, dtype=np.complex128)
         W[0, 0] = 1
         W[1, 0] = 1
         W[0, 1] = 1
