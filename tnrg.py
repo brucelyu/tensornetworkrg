@@ -922,6 +922,13 @@ class TensorNetworkRG2D(TensorNetworkRG):
         sqtr = (ncon([tm, tm], [[-1, 1], [1, -2]])).trace().norm()
         return trsq / sqtr
 
+    def degIndX2(self, direction="y"):
+        tm = self.generate_tm(direction=direction)
+        s = tm.svd([0], [1])[1]
+        trsq = s.sum()**2
+        sqtr = (s**2).sum()
+        return trsq / sqtr
+
 
 class TensorNetworkRG3D(TensorNetworkRG):
     """
