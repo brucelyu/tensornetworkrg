@@ -117,6 +117,45 @@ def block4ten(A, p):
     return Ap
 
 
+def l1Split(A, chiM, epsM):
+    """Split A along l1 using EVD
+    Tensor leg order convention is
+    A[x, y, x', y'] and it will be split along l1
+          y  l1
+          |/
+      x'--A--x
+        / |
+          y'
+    """
+    # Check the reflection symmetry along l1
+    # A[x, y, x', y'] = A[y, x, y', x']
+    errMsg = "No reflection symmetry along l1 for the input tensor A"
+    assert A.allclose(A.transpose([1, 0, 3, 2]).conj()), errMsg
+
+    # Peform the EVD of A along l1
+    eigv, v, err = A.eig(
+        [2, 1], [3, 0], hermitian=True,
+        chis=[i+1 for i in range(chiM)], eps=epsM,
+        return_rel_err=True
+    )
+    return eigv, v, err**2
+
+
+def bktenTRG(v, eigv, p):
+    """contraction of a 2x2 block of tensors with O(χ^6) costs
+    We use an idea from the TRG to lower the costs of the block-tensor map
+    from O(χ^8) to O(χ^6)
+
+    """
+    C = ncon([v.conj(), v, p.conj()],
+             [[1, 2, -1], [1, 3, -2], [2, 3, -3]])
+    Ct = C.multiply_diag(eigv, 0, direction='l')
+    Ch = C.multiply_diag(eigv, 1, direction='r')
+    Ap = ncon([Ct, Ch.conj(), Ct, Ch.conj()],
+              [[3, 1, -1], [3, 2, -2], [4, 2, -3], [4, 1, -4]])
+    return Ap
+
+
 def trunc_err_func(eigv, chi):
     """
     No need to take square since we work with M M'
