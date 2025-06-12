@@ -39,7 +39,7 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
     elif scheme == "tnr":
         init_dirs = [1, 1, 1, 1]
     elif scheme in ["block", "efrg"]:
-        if ver == "rotsym":
+        if ver in ["rotsym", "rotsymTRG"]:
             init_dirs = [1, -1, 1, -1]
     else:
         raise NotImplementedError("Not implemented yet")
@@ -106,7 +106,7 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
         if ver == "general":
             tnrg_pars = {"chi": chi, "dtol": dtol, "display": True}
     elif scheme == "block":
-        if ver == "rotsym":
+        if ver in ["rotsym", "rotsymTRG"]:
             tnrg_pars = {"chi": chi, "dtol": dtol, "display": True}
     elif scheme == "efrg":
         chis = pars["chis"]

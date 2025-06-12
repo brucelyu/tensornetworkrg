@@ -546,13 +546,17 @@ class TensorNetworkRG2D(TensorNetworkRG):
 
     def bkten_rot(
         self,
-        pars={"chi": 4, "dtol": 1e-16, "display": True}
+        pars={"chi": 4, "dtol": 1e-16, "display": True},
+        isTRG=False
     ):
         """
         Block-tensor RG that preseves two lattice symmetries
         - reflection
         - rotation
         Furthermore, the RG map imposes the rotational symmetry
+
+        If isTRG=True, we use the TRG splitting to make the
+        costs of the block contraction lower
         """
         if self.iter_n == 0:
             # In this scheme, a pair of two isometries
@@ -570,24 +574,44 @@ class TensorNetworkRG2D(TensorNetworkRG):
         if display:
             print("///////////////////////////")
         # Step 1. Determine isometric tensors
+        # - err is the norm sqaure
         p, g, err, eigv = block_rotsym.findProj(
             ten_cur, chi, cg_eps=cg_eps
         )
         # Step 2. Contraction of the 2x2 block
-        Aout = block_rotsym.block4ten(
-            ten_cur, p
-        )
+        if not isTRG:
+            Aout = block_rotsym.block4ten(
+                ten_cur, p
+            )
+        else:
+            # use the TRG splitting idea to lower the computational costs
+            chiM = chi * 2
+            # the eps here is norm without square
+            epsM = np.sqrt(np.abs(err * 1e-2))
+            # split the main tensor
+            trgD, trgv, errTRG = block_rotsym.l1Split(
+                ten_cur, chiM, epsM
+            )
+            # contraction
+            Aout = block_rotsym.bktenTRG(trgv, trgD, p)
         # print out info
         if display:
             print("The block-tensor map errors are")
             print("  - Error (out) = {:.2e}".format(err))
+            if isTRG:
+                print("    - The TRG splitting error is {:.2e}".format(errTRG))
+                chiTRG = trgv.flatten_shape(trgv.shape)[2]
+                print("      with χTRG = {:d}".format(chiTRG))
             print("-------")
             print("The singular value spectrum of A is:")
             scur = self.singlular_spectrum()
             print(scur[:20])
             print("-------")
             print("The Projective Trunction spectrum is:")
-            print(eigv[:20] / eigv[0])
+            eigArr = eigv / eigv.max()
+            eigArr = eigArr.to_ndarray()
+            eigArr = -np.sort(-np.abs(eigArr))
+            print(eigArr[:20])
             print("-------")
             # Check the symmetry of the coarse-grained tensor
             print("Check symmetry of the coarse-grained tensor:")
@@ -756,6 +780,11 @@ class TensorNetworkRG2D(TensorNetworkRG):
                 (lferrs,
                  SPerrs
                  ) = self.block_grl(tnrg_pars)
+            elif ver == "rotsymTRG":
+                # using TRG splitting to lower the cost
+                (lferrs,
+                 SPerrs
+                 ) = self.bkten_rot(tnrg_pars, isTRG=True)
         elif scheme == "efrg":
             if ver == "rotsym":
                 (lferrs,
