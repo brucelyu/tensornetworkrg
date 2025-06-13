@@ -75,11 +75,18 @@ def findProj(A, chi, cg_eps=1e-8):
     # the order of eigenvalues of ρ
     rho = densityM(A)
     # construct the SWAP matrix
-    eyeMat = rho.eye(rho.shape[0])
-    # Take care of the conj dir for abeliantensors
-    if eyeMat.dirs is not None:
+    if rho.dirs is not None:
+        # for abeliantensors
+        eyeMat = rho.eye(
+            rho.shape[0], qim=rho.qhape[0]
+        )
         eyeMat.dirs = [1, 1]
+    else:
+        # for normal tensors
+        eyeMat = rho.eye(rho.shape[0])
     SWAP = ncon([eyeMat, eyeMat.conj()], [[-1, -4], [-2, -3]])
+    if SWAP.dirs is not None:
+        SWAP.dirs = rho.dirs.copy()
     # perturb the density matrix ρ
     rhoP = rho + SWAP * cg_eps * 1e-2
     eigv, p, err = rhoP.eig(
