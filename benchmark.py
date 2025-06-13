@@ -110,7 +110,7 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
             tnrg_pars = {"chi": chi, "dtol": dtol, "display": True}
     elif scheme == "efrg":
         chis = pars["chis"]
-        if ver == "rotsym":
+        if ver in ["rotsym", "rotsymTRG"]:
             print("The additional hyper-parameters are")
             print("Entanglement-filtering squeezed bond dimension: ",
                   "--{:d}--".format(chis))

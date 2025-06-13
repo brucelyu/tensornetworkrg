@@ -634,8 +634,13 @@ class TensorNetworkRG2D(TensorNetworkRG):
     def efrg(
         self,
         pars={"chi": 6, "dtol": 1e-16, "display": True,
-              "chis": 4, "chienv": 16, "epsilon": 1e-8}
+              "chis": 4, "chienv": 16, "epsilon": 1e-8},
+        isTRG=False
     ):
+        """
+        If isTRG=True, we use the TRG splitting to make the
+        costs of the block contraction lower
+        """
         if self.iter_n == 0:
             # In this scheme, a pair of two isometries
             # has opposite arrow for input legs
@@ -663,6 +668,8 @@ class TensorNetworkRG2D(TensorNetworkRG):
             print("Shape of s is {}.".format(s.shape))
             print("Singular value of Lr is:")
             s_Lr = Lr.svd([0], [1])[1]
+            s_Lr = s_Lr.to_ndarray()
+            s_Lr = -np.sort(-np.abs(s_Lr))
             print(s_Lr[:10])
         # compute <ψ|ψ> for calculating fidelity
         PsiPsi = ncon([Upsilon0], [[1, 1, 2, 2]])
@@ -695,15 +702,35 @@ class TensorNetworkRG2D(TensorNetworkRG):
             As, chi, cg_eps=cg_eps
         )
         # II.2 Contraction of the 2x2 block
-        Aout = block_rotsym.block4ten(
-            As, p
-        )
+        if not isTRG:
+            Aout = block_rotsym.block4ten(
+                As, p
+            )
+        else:
+            # use the TRG splitting idea to lower the computational costs
+            chiM = chi * 2
+            # the eps here is norm without square
+            epsM = np.sqrt(np.abs(err * 1e-2))
+            # split the main tensor
+            trgD, trgv, errTRG = block_rotsym.l1Split(
+                As, chiM, epsM
+            )
+            # contraction
+            Aout = block_rotsym.bktenTRG(trgv, trgD, p)
+
         # print out info of the block-tensor map
         if display:
             print("The block-tensor map error is")
             print("  - Error (out) = {:.2e}".format(err))
+            if isTRG:
+                print("    - The TRG splitting error is {:.2e}".format(errTRG))
+                chiTRG = trgv.flatten_shape(trgv.shape)[2]
+                print("      with χTRG = {:d}".format(chiTRG))
             print("The Projective Trunction spectrum is:")
-            print(eigv[:20] / eigv[0])
+            eigArr = eigv / eigv.max()
+            eigArr = eigArr.to_ndarray()
+            eigArr = -np.sort(-np.abs(eigArr))
+            print(eigArr[:20])
             print("The singular value spectrum of A is (diagonal SVD):")
             scur = self.singlular_spectrum()
             print(scur[:20])
@@ -790,6 +817,11 @@ class TensorNetworkRG2D(TensorNetworkRG):
                 (lferrs,
                  SPerrs
                  ) = self.efrg(tnrg_pars)
+            elif ver == "rotsymTRG":
+                # using TRG splitting to lower the cost
+                (lferrs,
+                 SPerrs
+                 ) = self.efrg(tnrg_pars, isTRG=True)
         return lferrs, SPerrs
 
     def init_dw(self):
