@@ -709,6 +709,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
         else:
             # use the TRG splitting idea to lower the computational costs
             chiM = chi * 2
+            # chiM = int(chi**(1.5))
             # the eps here is norm without square
             epsM = np.sqrt(np.abs(err * 1e-2))
             # split the main tensor
