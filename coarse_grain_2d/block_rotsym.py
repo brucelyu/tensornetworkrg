@@ -177,9 +177,9 @@ def reflect(A, axis, g=None):
     assert axis in ["x", "y"]
     if g is None:
         if axis == "x":
-            Arefl = A.transpose([2, 1, 0, 3])
+            Arefl = A.transpose([2, 1, 0, 3]).conj()
         elif axis == "y":
-            Arefl = A.transpose([0, 3, 2, 1])
+            Arefl = A.transpose([0, 3, 2, 1]).conj()
     else:
         # convert array g to a diagonal matrix with dirs=[1, 1]
         gM = g.diag()               # dirs=[1, -1] by default
@@ -199,8 +199,7 @@ def reflect(A, axis, g=None):
 
 def rotate(A, g=None):
     if g is None:
-        # conjugate here is just for Z2-symmetric tensors dirs
-        Arot = A.transpose([3, 0, 1, 2]).conj()
+        Arot = A.transpose([3, 0, 1, 2])
     else:
         # convert array g to a diagonal matrix with dirs=[1, 1]
         gM = g.diag()               # dirs=[1, -1] by default
