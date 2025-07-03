@@ -856,7 +856,8 @@ class TensorNetworkRG2D(TensorNetworkRG):
                         [2, -2], [4, -4]])
         return ten_new
 
-    def gu_wen_cardy(self, aspect_ratio=1, num_scale=12):
+    def gu_wen_cardy(self, aspect_ratio=1, num_scale=12,
+                     indId=0):
         """
         Extract the central charge and scaling dimensions
         a la Gu, Wen and Cardy
@@ -885,7 +886,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
         eig_val = np.abs(eig_val)
         eig_val = -np.sort(-eig_val)
         central_charge = np.log(eig_val[0]) * 6 / np.pi * aspect_ratio
-        scaling_dimensions = -np.log(eig_val/eig_val[0])/(2*np.pi)*aspect_ratio
+        scaling_dimensions = -np.log(eig_val/eig_val[indId])/(2*np.pi)*aspect_ratio
         return central_charge, scaling_dimensions
 
     def eval_free_energy(self, initial_spin=2, b=2):
