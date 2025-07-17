@@ -203,7 +203,7 @@ def hardDisk_sqlat1NN(z, scheme="IRF"):
         A (Tensor): a 4-leg tensor
 
     """
-    assert scheme in ["IRF", "trg"]
+    assert scheme in ["IRF", "trg", "trgR"]
     if scheme == "IRF":
         # The copydot tensor
         # We put the activity z on this dot
@@ -260,6 +260,27 @@ def hardDisk_sqlat1NN(z, scheme="IRF"):
         W[0, 1] = 1
         # This initial tensor has bond dimension 2
         A = ncon([c, c, c, c, W, W, W, W], [
+            [2, 7, -1], [1, 5, -2], [3, 8, -3], [4, 6, -4],
+            [1, 2], [5, 8], [3, 4], [7, 6]
+        ])
+    elif scheme == "trgR":
+        # real representation for the negative activity case
+        errMsg = "The activity z should be non positive!"
+        assert z <= 0, errMsg
+        # The 3-leg copy dot tensor
+        cp = Tensor.zeros([2, 2, 2])
+        cm = Tensor.zeros([2, 2, 2])
+        cp[0, 0, 0] = 1
+        cp[1, 1, 1] = np.sqrt(np.abs(z))
+        cm[0, 0, 0] = 1
+        cm[1, 1, 1] = -np.sqrt(np.abs(z))
+        # The 1NN matrix
+        W = Tensor.zeros([2, 2])
+        W[0, 0] = 1
+        W[1, 0] = 1
+        W[0, 1] = 1
+        # This initial tensor has bond dimension 2
+        A = ncon([cp, cp, cm, cm, W, W, W, W], [
             [2, 7, -1], [1, 5, -2], [3, 8, -3], [4, 6, -4],
             [1, 2], [5, 8], [3, 4], [7, 6]
         ])
