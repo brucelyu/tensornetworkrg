@@ -857,7 +857,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
         return ten_new
 
     def gu_wen_cardy(self, aspect_ratio=1, num_scale=12,
-                     indId=0, onlyTMeig=False):
+                     indId=0, onlyTMeig=False, isSparse=True):
         """
         Extract the central charge and scaling dimensions
         a la Gu, Wen and Cardy
@@ -881,7 +881,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
         in_leg = [k for k in range(aspect_ratio)]
         out_leg = [k + aspect_ratio for k in range(aspect_ratio)]
         eig_val = transfer_mat.eig(in_leg, out_leg,
-                                   sparse=True, chis=num_scale)[0]
+                                   sparse=isSparse, chis=num_scale)[0]
         if onlyTMeig:
             # only return eigenvalues of the transfer matrix
             return eig_val
