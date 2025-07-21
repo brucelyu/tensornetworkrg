@@ -32,7 +32,7 @@ class TensorNetworkRG:
     Tensor network renormalization group
     """
     model_choice = ("ising2d", "ising3d", "golden chain", "cdl2d",
-                    "hardsquare1NN")
+                    "hardsquare1NN", "hardsquareNeg")
     ising_models = ("ising2d", "ising3d")
 
     def __init__(self, model):

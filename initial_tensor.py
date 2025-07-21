@@ -14,7 +14,7 @@ import numpy as np
 from ncon import ncon
 
 MODEL_CHOICE = ("ising2d", "ising3d", "golden chain",
-                "hardsquare1NN")
+                "hardsquare1NN", "hardsquareNeg")
 
 
 def initial_tensor(model, model_parameters, is_sym=False,
