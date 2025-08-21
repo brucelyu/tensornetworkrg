@@ -756,6 +756,91 @@ class TensorNetworkRG2D(TensorNetworkRG):
 
         return lrerr, SPerrs
 
+    def efrg_reflsym(
+        self,
+        pars={"chi": 6, "chiIn": 6, "dtol": 1e-16, "display": True,
+              "chis": 4, "chienv": 16, "epsilon": 1e-8}
+    ):
+        if self.iter_n == 0:
+            # In this scheme, a pair of two isometries of opposite legs
+            # has same arrow for input legs
+            self.init_dw()
+            self.boundary = "parallel"
+        # read parameters
+        chi = pars["chi"]
+        chiIn = pars["chiIn"]
+        cg_eps = pars["dtol"]
+        display = pars["display"]
+        chis = pars["chis"]
+        chienv = pars["chienv"]
+        epsilon = pars["epsilon"]
+
+        # read the input tensor
+        Ain = self.get_tensor()
+
+        # I. Entanglement filtering (EF)
+
+        lrerr = 0.0
+        # TODO (EF not implemented yet)
+        As = Ain * 1.0
+
+        # II. Block-tensor map using projective truncations
+        # II.1 y-collapse
+        #   isometry for the outer leg:
+        #       Two y legs of the second As is swapped
+        px, errx, eigvx = hotrg2d.optProj(
+            As, As.transpose([0, 3, 2, 1]).conj(),
+            chi, direction="y", cg_eps=cg_eps
+        )
+        #   isometry for the inner leg:
+        #       Two x legs of the first As is swapped
+        #       Legs in both directions of the second one are swapped
+        pin, errin, eigvin = hotrg2d.optProj(
+            As.transpose([2, 1, 0, 3]).conj(), As.transpose([2, 3, 0, 1]),
+            chiIn, direction="y", cg_eps=cg_eps
+        )
+        # contraction in the y direction
+        Ay = hotrg2d.collap2ten(
+            As, As.transpose([0, 3, 2, 1]).conj(),
+            px.conjugate(), pin, direction="y"
+        )
+
+        # II.2 x-collapse
+        py, erry, eigvy = hotrg2d.optProj(
+            Ay, Ay.transpose([2, 1, 0, 3]).conj(),
+            chi, direction="x", cg_eps=cg_eps
+        )
+        Aout = hotrg2d.collap2ten(
+            Ay, Ay.transpose([2, 1, 0, 3]).conj(),
+            py.conjugate(), py, direction="x"
+        )
+
+        if display:
+            print("The HOTRG errors are")
+            print("  - Error (out x) = {:.2e}".format(errx))
+            print("  - Error (out y) = {:.2e}".format(erry))
+            print("  - Error (inner) = {:.2e}".format(errin))
+            print("-------")
+
+        # update the current tensor
+        self.current_tensor = Aout * 1.0
+        # pull out the tensor norm and save
+        ten_mag = self.pullout_magnitude()
+        self.save_tensor_magnitude(ten_mag)
+        # save isometric tensors and SWAP signs
+        self.isometry_applied = [px, py]  # x and y directions
+        # return errors
+        SPerrs = [errx, erry]
+
+        # print out info of the current tensor
+        if display:
+            print("The singular value spectrum of A is:")
+            scur = self.singlular_spectrum()
+            print(scur[:20])
+            print("===========================")
+
+        return lrerr, SPerrs
+
     def rgmap(self, tnrg_pars,
               scheme="fet-hotrg", ver="base"):
         """
@@ -823,6 +908,11 @@ class TensorNetworkRG2D(TensorNetworkRG):
                 (lferrs,
                  SPerrs
                  ) = self.efrg(tnrg_pars, isTRG=True)
+            elif ver == "reflsym":
+                # only exploit the lattice-reflection symmetry
+                (lferrs,
+                 SPerrs
+                 ) = self.efrg_reflsym(tnrg_pars)
         return lferrs, SPerrs
 
     def init_dw(self):

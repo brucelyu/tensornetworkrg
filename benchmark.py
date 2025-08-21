@@ -41,6 +41,8 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
     elif scheme in ["block", "efrg"]:
         if ver in ["rotsym", "rotsymTRG"]:
             init_dirs = [1, -1, 1, -1]
+        elif ver == "reflsym":
+            init_dirs = [1, 1, -1, -1]
     else:
         raise NotImplementedError("Not implemented yet")
     # generate initial tensor
@@ -116,6 +118,19 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
                   "--{:d}--".format(chis))
             tnrg_pars = {"chi": chi, "dtol": dtol, "display": True,
                          "chis": chis, "chienv": chis**2, "epsilon": dtol}
+        elif ver == "reflsym":
+            chiIn = pars["chiIn"]
+            chienv = pars["chienv"]
+            EFepsilon = pars["epsilon"]
+            print("The additional hyper-parameters are")
+            print("Entanglement-filtering squeezed bond dimension: ")
+            print("     chis: --{:d}--".format(chis))
+            print("Inner bond dimension for the HOTRG: ")
+            print("    chiIn: --{:d}--".format(chiIn))
+            print()
+            tnrg_pars = {"chi": chi, "chiIn": chiIn, "dtol": dtol,
+                         "display": True,
+                         "chis": chis, "chienv": chienv, "epsilon": EFepsilon}
     else:
         raise NotImplementedError("Not implemented yet")
 
@@ -439,6 +454,7 @@ def tnrgIterate(tnrgCase, rg_n=21, scheme="fet-hotrg", ver="base",
         print(tnrgCase.get_tensor().shape)
         print("----------")
         print("----------")
+        print()
 
     return lrerrList, errVList, errHList, gList
 
