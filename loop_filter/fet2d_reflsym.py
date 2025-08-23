@@ -22,8 +22,9 @@ Some functions in the file `./env2d_reflsym.py` that only exploits
 the lattice reflection are also reused here.
 """
 from .. import u1ten
-from . import env2d_rotsym, env2d_reflsym
+from . import env2d_reflsym, env2d_rotsym, fet2d_rotsym
 from ncon import ncon
+from itertools import cycle
 
 
 # I. For the initialization of the filtering matriices sx and sy
@@ -45,7 +46,7 @@ def init_s(A, chis, chienv, epsilon, epsilon_inv=1e-10,
             useful for later optimization of s
 
     """
-    Upsilon0 = env2d_reflsym(A, bond=bond)
+    Upsilon0 = env2d_reflsym.build_Upsilon0(A, bond=bond)
     # determine the low-rank matrix (like Gilt without recursion)
     # Step 1. Take the Moore-Penrose inverse of the Upsilon tensor
     Upsilon0_pinv = u1ten.pinv(
@@ -62,5 +63,122 @@ def init_s(A, chis, chienv, epsilon, epsilon_inv=1e-10,
     return s, Lr, Upsilon0
 
 
+# II. For optimization of sx and sy
+def update_s(A, sx, sy, PsiPsi, epsilon, bond="x"):
+    """Update a filtering matrix
+    """
+    # the old filtering matrix
+    if bond == "x":
+        sold = sx * 1.0
+    else:
+        sold = sy * 1.0
+    # construct Υ and Q
+    Upsilon, Q = env2d_reflsym.build_UpsilonQ(A, sx, sy, bond=bond)
+    # calculate the old error
+    errOld = env2d_rotsym.plaqFidelity(sold, Q, Upsilon, PsiPsi)[1]
+
+    # propose a candidate filtering matrix s
+    stemp = fet2d_rotsym.propose_s(Q, Upsilon, epsilon=epsilon)
+    # normalized stemp (for the convex combination)
+    stemp = stemp / stemp.norm()
+    # try 10 convex combinations of sold and stemp
+    # make sure the approximation error go down
+    # (This idea is taken from Evenbly's TNR codes)
+    for p in range(11):
+        # take the convex combination
+        snew = (1 - 0.1 * p) * stemp + 0.1 * p * sold
+        # calculate the fidelity
+        if bond == "x":
+            UpsilonN, QN = env2d_reflsym.build_UpsilonQ(A, snew, sy, bond=bond)
+        else:
+            UpsilonN, QN = env2d_reflsym.build_UpsilonQ(A, sx, snew, bond=bond)
+        errNew = env2d_rotsym.plaqFidelity(snew, QN, UpsilonN, PsiPsi)[1]
+        # once the FET error reduces, we update s matrix
+        if (errNew <= errOld) or (errNew < epsilon) or (p == 10):
+            # make sure the returned s matrix is normalized
+            snew = snew / snew.norm()
+            break
+    return snew, errNew
+
+
+def opt_s(A, sx0, sy0, PsiPsi,
+          epsilon=1e-10, iter_max=1000, display=True):
+    """iteratively update sx and sy to maximaize the fidelity
+
+    Args:
+        A (TensorCommon): the 4-leg tensor
+        sx0 (TensorCommon): the initial filtering matrix on x bond
+        sy0 (TensorCommon): the initial filtering matrix on y bond
+        PsiPsi (TensorCommon): the overlap <ψ|ψ>
+
+    Kwargs:
+        epsilon (float): safety for the inverse matrix (not essential here)
+        iter_max (int): maximal iteration
+        display (boolean): printout info
+
+    Returns:
+        sx, sy (TensorCommon): the optimized filtering matrices
+        err (float): the final error
+
+    """
+    # normalized filtering matrices
+    sx = sx0 / sx0.norm()
+    sy = sy0 / sy0.norm()
+    errs = []
+
+    # the initial EF error
+    Upsilonx, Qx = env2d_reflsym.build_UpsilonQ(A, sx, sy, bond="x")
+    err0 = env2d_rotsym.plaqFidelity(sx, Qx, Upsilonx, PsiPsi)[1]
+    errs.append(err0)
+    if display:
+        print("EF Error (initial) = {:.3e}".format(err0))
+    # return the initial solution if the EF error is already small
+    if err0 < epsilon:
+        return sx, sy, errs
+
+    # enter the optimization iteration
+    bondCycle = cycle(["x", "y"])
+    for k in range(iter_max):
+        bond = next(bondCycle)
+        # deterine the new filtering matrix
+        snew, errNew = update_s(
+            A, sx, sy, PsiPsi, epsilon, bond=bond
+        )
+        # update sx, sy matrices
+        if bond == "x":
+            sx = snew * 1.0
+        else:
+            sy = snew * 1.0
+        # record the EF error
+        errs.append(errNew)
+
+        # exit the iteration if the error is very small
+        if errNew < epsilon:
+            break
+        # exit the iteration if the error converges
+        if k > 99 and k % 100 == 0:
+            if display:
+                print("EF Error (iter {:2d}) = {:.3e}".format(k, errs[-1]))
+            isConverge = (
+                abs((errs[-1] - errs[-101]) / (errs[-101] + 1e-8)
+                    ) < 0.010
+            )
+            if isConverge:
+                break
+    return sx, sy, errs
+
+
+def fidelity(A, sx, sy, PsiPsi):
+    Upsilonx, Qx = env2d_reflsym.build_UpsilonQ(A, sx, sy, bond="x")
+    f, err, PhiPhi = env2d_rotsym.plaqFidelity(sx, Qx, Upsilonx, PsiPsi)
+    return f, err, PhiPhi
+
+
+# III. Apply the sx and sy to the 4-leg tensor A
+def absorb(A, sx, sy):
+    As = ncon([A, sx, sy],
+              [[1, 2, -3, -4], [1, -1], [2, -2]]
+              )
+    return As
 
 # end of file

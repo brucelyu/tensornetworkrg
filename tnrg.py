@@ -20,7 +20,7 @@ from .coarse_grain_3d import block_tensor as bkten3d
 from .coarse_grain_3d import efrg as efrg3d
 from .loop_filter import (
     cleanLoop, toymodels, fet3d, env3d, fet3dcube, fet3dloop,
-    fet2d_rotsym
+    fet2d_rotsym, fet2d_reflsym
 )
 from . import u1ten
 from datetime import datetime
@@ -779,10 +779,54 @@ class TensorNetworkRG2D(TensorNetworkRG):
         Ain = self.get_tensor()
 
         # I. Entanglement filtering (EF)
+        # I.1 Initialization of the filtering matrices sx and sy
+        (
+            sx, Lrx, Upsilon0x
+        ) = fet2d_reflsym.init_s(
+            Ain, chis, chienv, epsilon, epsilon_inv=cg_eps, bond="x"
+        )
+        (
+            sy, Lry, Upsilon0y
+        ) = fet2d_reflsym.init_s(
+            Ain, chis, chienv, epsilon, epsilon_inv=cg_eps, bond="y"
+        )
+        if display:
+            print("Shape of sx is {}.".format(sx.shape))
+            print("Shape of sy is {}.".format(sy.shape))
+            print("Singular value of Lrx is:")
+            s_Lrx = Lrx.svd([0], [1])[1]
+            s_Lrx = s_Lrx.to_ndarray()
+            s_Lrx = -np.sort(-np.abs(s_Lrx))
+            print(s_Lrx[:10])
+            print("Singular value of Lry is:")
+            s_Lry = Lry.svd([0], [1])[1]
+            s_Lry = s_Lry.to_ndarray()
+            s_Lry = -np.sort(-np.abs(s_Lry))
+            print(s_Lry[:10])
+        # compute <ψ|ψ> for calculating fidelity
+        PsiPsi = ncon([Upsilon0x], [[1, 1, 2, 2]])
 
-        lrerr = 0.0
-        # TODO (EF not implemented yet)
-        As = Ain * 1.0
+        # I.2 Update the sx and sy matrices to minimize the EF error
+        sx, sy, errsEF = fet2d_reflsym.opt_s(
+            Ain, sx, sy, PsiPsi, epsilon=cg_eps,
+            iter_max=2000, display=display
+        )
+        # final EF error
+        errEF1, PhiPhi1 = fet2d_reflsym.fidelity(Ain, sx, sy, PsiPsi)[1:]
+        if display:
+            print("  Initial EF error is {:.3e}".format(errsEF[0]))
+            print("    Final EF error is {:.3e}".format(errEF1))
+
+        # I.3 Take care the overall magnitude of sx and sy to
+        # make sure that <ψ|ψ> = <φ|φ>
+        PsiDivPhi = (PsiPsi / PhiPhi1).norm()
+        sx = sx * (PsiDivPhi)**(1/16)
+        sy = sy * (PsiDivPhi)**(1/16)
+
+        # I.4 Act the filtering matrix s on the main tensor:
+        As = fet2d_reflsym.absorb(Ain, sx, sy)
+
+        lrerr = [errsEF[0], errEF1]
 
         # II. Block-tensor map using projective truncations
         # II.1 y-collapse
