@@ -872,8 +872,8 @@ class TensorNetworkRG2D(TensorNetworkRG):
         ten_mag = self.pullout_magnitude()
         self.save_tensor_magnitude(ten_mag)
         # save isometric tensors and SWAP signs
-        self.isometry_applied = [px, py,  # isometric tensors
-                                 sx, sy]  # filtering matrices
+        self.isometry_applied = [px, py, pin,  # isometric tensors
+                                 sx, sy]       # filtering matrices
         # return errors
         SPerrs = [errx, erry]
 
