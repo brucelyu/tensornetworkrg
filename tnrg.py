@@ -15,6 +15,7 @@ from .initial_tensor import initial_tensor
 from .coarse_grain_2d import trg_evenbly, tnr_evenbly, hotrg, block_rotsym, block_grl
 from .coarse_grain_2d import hotrg_grl as hotrg2d
 from .coarse_grain_2d import trg as trg2d
+from .coarse_grain_2d import signfix as sf2d
 from .coarse_grain_3d import hotrg as hotrg3d
 from .coarse_grain_3d import block_tensor as bkten3d
 from .coarse_grain_3d import efrg as efrg3d
@@ -759,7 +760,8 @@ class TensorNetworkRG2D(TensorNetworkRG):
     def efrg_reflsym(
         self,
         pars={"chi": 6, "chiIn": 6, "dtol": 1e-16, "display": True,
-              "chis": 4, "chienv": 16, "epsilon": 1e-8}
+              "chis": 4, "chienv": 16, "epsilon": 1e-8},
+        signFix=False,
     ):
         if self.iter_n == 0:
             # In this scheme, a pair of two isometries of opposite legs
@@ -777,18 +779,19 @@ class TensorNetworkRG2D(TensorNetworkRG):
 
         # read the input tensor
         Ain = self.get_tensor()
+        Aout = Ain * 1.0
 
         # I. Entanglement filtering (EF)
         # I.1 Initialization of the filtering matrices sx and sy
         (
             sx, Lrx, Upsilon0x
         ) = fet2d_reflsym.init_s(
-            Ain, chis, chienv, epsilon, epsilon_inv=cg_eps, bond="x"
+            Aout, chis, chienv, epsilon, epsilon_inv=cg_eps, bond="x"
         )
         (
             sy, Lry, Upsilon0y
         ) = fet2d_reflsym.init_s(
-            Ain, chis, chienv, epsilon, epsilon_inv=cg_eps, bond="y"
+            Aout, chis, chienv, epsilon, epsilon_inv=cg_eps, bond="y"
         )
         if display:
             print("Shape of sx is {}.".format(sx.shape))
@@ -808,11 +811,11 @@ class TensorNetworkRG2D(TensorNetworkRG):
 
         # I.2 Update the sx and sy matrices to minimize the EF error
         sx, sy, errsEF = fet2d_reflsym.opt_s(
-            Ain, sx, sy, PsiPsi, epsilon=cg_eps,
+            Aout, sx, sy, PsiPsi, epsilon=cg_eps,
             iter_max=2000, display=display
         )
         # final EF error
-        errEF1, PhiPhi1 = fet2d_reflsym.fidelity(Ain, sx, sy, PsiPsi)[1:]
+        errEF1, PhiPhi1 = fet2d_reflsym.fidelity(Aout, sx, sy, PsiPsi)[1:]
         if display:
             print("  Initial EF error is {:.3e}".format(errsEF[0]))
             print("    Final EF error is {:.3e}".format(errEF1))
@@ -824,7 +827,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
         sy = sy * (PsiDivPhi)**(1/16)
 
         # I.4 Act the filtering matrix s on the main tensor:
-        As = fet2d_reflsym.absorb(Ain, sx, sy)
+        Aout = fet2d_reflsym.absorb(Aout, sx, sy)
 
         lrerr = [errsEF[0], errEF1]
 
@@ -833,31 +836,40 @@ class TensorNetworkRG2D(TensorNetworkRG):
         #   isometry for the outer leg:
         #       Two y legs of the second As is swapped
         px, errx, eigvx = hotrg2d.optProj(
-            As, As.transpose([0, 3, 2, 1]).conj(),
+            Aout, Aout.transpose([0, 3, 2, 1]).conj(),
             chi, direction="y", cg_eps=cg_eps
         )
         #   isometry for the inner leg:
         #       Two x legs of the first As is swapped
         #       Legs in both directions of the second one are swapped
         pin, errin, eigvin = hotrg2d.optProj(
-            As.transpose([2, 1, 0, 3]).conj(), As.transpose([2, 3, 0, 1]),
+            Aout.transpose([2, 1, 0, 3]).conj(), Aout.transpose([2, 3, 0, 1]),
             chiIn, direction="y", cg_eps=cg_eps
         )
         # contraction in the y direction
-        Ay = hotrg2d.collap2ten(
-            As, As.transpose([0, 3, 2, 1]).conj(),
+        Aout = hotrg2d.collap2ten(
+            Aout, Aout.transpose([0, 3, 2, 1]).conj(),
             px.conjugate(), pin, direction="y"
         )
 
         # II.2 x-collapse
         py, erry, eigvy = hotrg2d.optProj(
-            Ay, Ay.transpose([2, 1, 0, 3]).conj(),
+            Aout, Aout.transpose([2, 1, 0, 3]).conj(),
             chi, direction="x", cg_eps=cg_eps
         )
         Aout = hotrg2d.collap2ten(
-            Ay, Ay.transpose([2, 1, 0, 3]).conj(),
+            Aout, Aout.transpose([2, 1, 0, 3]).conj(),
             py.conjugate(), py, direction="x"
         )
+
+        # III. Sign fixing
+        if signFix and (Aout.shape == Ain.shape):
+            if display:
+                print("---------------")
+                print("Sign fixing...")
+            Aout, signx, signy = sf2d.findSigns(Aout, Ain)
+            # apply the sign matrices to px and py
+            px, py = sf2d.signOnp(px, py, signx, signy)
 
         if display:
             print("The HOTRG errors are")
@@ -887,7 +899,8 @@ class TensorNetworkRG2D(TensorNetworkRG):
         return lrerr, SPerrs
 
     def rgmap(self, tnrg_pars,
-              scheme="fet-hotrg", ver="base"):
+              scheme="fet-hotrg", ver="base",
+              signFix=False):
         """
         coarse grain the tensors using schemes above
         - block tensor
@@ -957,7 +970,8 @@ class TensorNetworkRG2D(TensorNetworkRG):
                 # only exploit the lattice-reflection symmetry
                 (lferrs,
                  SPerrs
-                 ) = self.efrg_reflsym(tnrg_pars)
+                 ) = self.efrg_reflsym(tnrg_pars,
+                                       signFix=signFix)
         return lferrs, SPerrs
 
     def init_dw(self):
