@@ -28,7 +28,7 @@ import numpy as np
 from ncon import ncon
 
 
-def optProj(A, B, chi, direction="x", cg_eps=1e-8):
+def optProj(A, B, chi, direction="x", cg_eps=1e-8, chiSet=None):
     """determine the isometry p for fusing two legs
 
     Args:
@@ -67,7 +67,8 @@ def optProj(A, B, chi, direction="x", cg_eps=1e-8):
         [0, 1], [2, 3], hermitian=True,
         chis=[i+1 for i in range(chi)], eps=cg_eps,
         trunc_err_func=trunc_err_func,
-        return_rel_err=True
+        return_rel_err=True,
+        chiSet=chiSet
     )
     return p, err, eigv
 

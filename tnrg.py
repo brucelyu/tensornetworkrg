@@ -762,6 +762,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
         pars={"chi": 6, "chiIn": 6, "dtol": 1e-16, "display": True,
               "chis": 4, "chienv": 16, "epsilon": 1e-8},
         signFix=False,
+        isFixChi=False
     ):
         if self.iter_n == 0:
             # In this scheme, a pair of two isometries of opposite legs
@@ -780,6 +781,22 @@ class TensorNetworkRG2D(TensorNetworkRG):
         # read the input tensor
         Ain = self.get_tensor()
         Aout = Ain * 1.0
+
+        # keep a record of the shape of the input tensor
+        if isFixChi:
+            chixSet = [x for _, x in sorted(zip(
+                Ain.qhape[0], Ain.shape[0]
+            ))]
+            chiySet = [x for _, x in sorted(zip(
+                Ain.qhape[1], Ain.shape[1]
+            ))]
+            if display:
+                print("The output leg shape will be fixed to be:")
+                print("    -- x leg: {} ([0, 1])".format(chixSet))
+                print("     --y leg: {} ([0, 1])".format(chiySet))
+        else:
+            chixSet = None
+            chiySet = None
 
         # I. Entanglement filtering (EF)
         # I.1 Initialization of the filtering matrices sx and sy
@@ -837,7 +854,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
         #       Two y legs of the second As is swapped
         px, errx, eigvx = hotrg2d.optProj(
             Aout, Aout.transpose([0, 3, 2, 1]).conj(),
-            chi, direction="y", cg_eps=cg_eps
+            chi, direction="y", cg_eps=cg_eps, chiSet=chixSet
         )
         #   isometry for the inner leg:
         #       Two x legs of the first As is swapped
@@ -855,7 +872,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
         # II.2 x-collapse
         py, erry, eigvy = hotrg2d.optProj(
             Aout, Aout.transpose([2, 1, 0, 3]).conj(),
-            chi, direction="x", cg_eps=cg_eps
+            chi, direction="x", cg_eps=cg_eps, chiSet=chiySet
         )
         Aout = hotrg2d.collap2ten(
             Aout, Aout.transpose([2, 1, 0, 3]).conj(),
@@ -900,7 +917,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
 
     def rgmap(self, tnrg_pars,
               scheme="fet-hotrg", ver="base",
-              signFix=False):
+              signFix=False, isFixChi=False):
         """
         coarse grain the tensors using schemes above
         - block tensor
@@ -971,7 +988,8 @@ class TensorNetworkRG2D(TensorNetworkRG):
                 (lferrs,
                  SPerrs
                  ) = self.efrg_reflsym(tnrg_pars,
-                                       signFix=signFix)
+                                       signFix=signFix,
+                                       isFixChi=isFixChi)
         return lferrs, SPerrs
 
     def init_dw(self):
