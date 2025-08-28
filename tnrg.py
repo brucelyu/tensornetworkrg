@@ -810,9 +810,9 @@ class TensorNetworkRG2D(TensorNetworkRG):
         PsiPsi = ncon([Upsilon0x], [[1, 1, 2, 2]])
 
         # I.2 Update the sx and sy matrices to minimize the EF error
-        sx, sy, errsEF = fet2d_reflsym.opt_s(
+        sx, sy, errsEF = fet2d_reflsym.opt_alls(
             Aout, sx, sy, PsiPsi, epsilon=cg_eps,
-            iter_max=2000, display=display
+            iter_max=10, n_round=40, display=display
         )
         # final EF error
         errEF1, PhiPhi1 = fet2d_reflsym.fidelity(Aout, sx, sy, PsiPsi)[1:]

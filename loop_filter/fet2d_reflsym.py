@@ -24,7 +24,7 @@ the lattice reflection are also reused here.
 from .. import u1ten
 from . import env2d_reflsym, env2d_rotsym, fet2d_rotsym
 from ncon import ncon
-from itertools import cycle
+import itertools
 
 
 # I. For the initialization of the filtering matriices sx and sy
@@ -64,6 +64,90 @@ def init_s(A, chis, chienv, epsilon, epsilon_inv=1e-10,
 
 
 # II. For optimization of sx and sy
+def opt_alls(A, sx, sy, PsiPsi, epsilon=1e-10,
+             iter_max=5, n_round=40, display=True):
+    """optimized filtering matrices sx and sy
+    """
+    bond_list = ["x", "y"]
+    errHistory = []
+    for m in range(n_round):
+        doneLegs = {k: False for k in bond_list}
+        for bond in bond_list:
+            # find an updated s
+            snew, err = opt_1s(
+                A, sx, sy, PsiPsi, epsilon, bond, iter_max
+            )
+            # update s
+            if bond == "x":
+                sx = snew * 1.0
+            elif bond == "y":
+                sy = snew * 1.0
+            # record error
+            errHistory.append(err)
+            if display and (m % 5 == 0 or m == n_round - 1):
+                print("This is round {:d} for leg {:s}:".format(m+1, bond),
+                      "EF Error {:.3e} ---> {:.3e}".format(err[0], err[-1]),
+                      "(in {:d} iterations)".format(len(err) - 1)
+                      )
+            # if the change of FET error is small, or the FET itself is small,
+            # the optimization for the leg is done
+            doneLegs[bond] = (
+                abs((err[-1] - err[1]) / (err[1] + epsilon)
+                    ) < (0.005 * iter_max/10)
+            ) or (abs(err[-1]) < epsilon)
+
+        # exit the round iteration if both legs are done
+        if all(doneLegs.values()):
+            if display:
+                print("  Final round {:d} for leg {:s}:".format(m+1, bond),
+                      "EF Error {:.3e} ---> {:.3e}".format(err[1], err[-1]),
+                      "(in {:d} iterations)".format(len(err) - 1)
+                      )
+            break
+    # flatten the errHistory list
+    errHistory = list(
+        itertools.chain.from_iterable(errHistory)
+    )
+    return sx, sy, errHistory
+
+
+def opt_1s(A, sx, sy, PsiPsi, epsilon, bond="x", iter_max=5):
+    """
+    Update a single filtering matrix s iteratively for `iter_max` times
+    using `update_s`
+    """
+    # the old filtering matrix
+    if bond == "x":
+        sold = sx * 1.0
+    else:
+        sold = sy * 1.0
+
+    snew = sold * 1.0
+    err = []
+
+    for k in range(iter_max):
+        # update s matrix on `bond`
+        snew, errNew, errOld = update_s(
+            A, sx, sy, PsiPsi, epsilon, bond=bond
+        )
+        # update sx, sy matrices
+        if bond == "x":
+            sx = snew * 1.0
+        else:
+            sy = snew * 1.0
+        # record the EF error
+        if k == 0:
+            err.append(errOld)
+            err.append(errNew)
+        else:
+            err.append(errNew)
+        # step the iteration if the error is small
+        if errNew < epsilon:
+            break
+
+    return snew, err
+
+
 def update_s(A, sx, sy, PsiPsi, epsilon, bond="x"):
     """Update a filtering matrix
     """
@@ -98,11 +182,11 @@ def update_s(A, sx, sy, PsiPsi, epsilon, bond="x"):
             # make sure the returned s matrix is normalized
             snew = snew / snew.norm()
             break
-    return snew, errNew
+    return snew, errNew, errOld
 
 
-def opt_s(A, sx0, sy0, PsiPsi,
-          epsilon=1e-10, iter_max=1000, display=True):
+def opt_s_cycl(A, sx0, sy0, PsiPsi,
+               epsilon=1e-10, iter_max=1000, display=True):
     """iteratively update sx and sy to maximaize the fidelity
 
     Args:
@@ -137,13 +221,13 @@ def opt_s(A, sx0, sy0, PsiPsi,
         return sx, sy, errs
 
     # enter the optimization iteration
-    bondCycle = cycle(["x", "y"])
+    bondCycle = itertools.cycle(["x", "y"])
     for k in range(iter_max):
         bond = next(bondCycle)
         # deterine the new filtering matrix
         snew, errNew = update_s(
             A, sx, sy, PsiPsi, epsilon, bond=bond
-        )
+        )[:2]
         # update sx, sy matrices
         if bond == "x":
             sx = snew * 1.0
