@@ -317,42 +317,42 @@ def linRG2scaleD(scheme="hotrg3d", ver="base", pars={},
             scDims000, idenEig = linRG2x(
                 Astar, isom[k], scheme=scheme,
                 ver=ver, cubeFilter=True, loopFilter=True,
-                nscaleD=[7, 5], comm=comm, refl_c=[0, 0, 0]
+                nscaleD=[9, 7], comm=comm, refl_c=[0, 0, 0]
             )
             scDims100 = linRG2x(
                 Astar, isom[k], scheme=scheme,
                 ver=ver, cubeFilter=True, loopFilter=True,
-                nscaleD=[3, 4], comm=comm, refl_c=[1, 0, 0],
+                nscaleD=[5, 5], comm=comm, refl_c=[1, 0, 0],
                 sector=[None, idenEig]
             )
             scDims010 = linRG2x(
                 Astar, isom[k], scheme=scheme,
                 ver=ver, cubeFilter=True, loopFilter=True,
-                nscaleD=[3, 4], comm=comm, refl_c=[0, 1, 0],
+                nscaleD=[5, 5], comm=comm, refl_c=[0, 1, 0],
                 sector=[None, idenEig]
             )
             scDims001 = linRG2x(
                 Astar, isom[k], scheme=scheme,
                 ver=ver, cubeFilter=True, loopFilter=True,
-                nscaleD=[3, 4], comm=comm, refl_c=[0, 0, 1],
+                nscaleD=[5, 5], comm=comm, refl_c=[0, 0, 1],
                 sector=[None, idenEig]
             )
             scDims110 = linRG2x(
                 Astar, isom[k], scheme=scheme,
                 ver=ver, cubeFilter=True, loopFilter=True,
-                nscaleD=[2, 2], comm=comm, refl_c=[1, 1, 0],
+                nscaleD=[3, 3], comm=comm, refl_c=[1, 1, 0],
                 sector=[None, idenEig]
             )
             scDims101 = linRG2x(
                 Astar, isom[k], scheme=scheme,
                 ver=ver, cubeFilter=True, loopFilter=True,
-                nscaleD=[2, 2], comm=comm, refl_c=[1, 0, 1],
+                nscaleD=[3, 3], comm=comm, refl_c=[1, 0, 1],
                 sector=[None, idenEig]
             )
             scDims011 = linRG2x(
                 Astar, isom[k], scheme=scheme,
                 ver=ver, cubeFilter=True, loopFilter=True,
-                nscaleD=[2, 2], comm=comm, refl_c=[0, 1, 1],
+                nscaleD=[3, 3], comm=comm, refl_c=[0, 1, 1],
                 sector=[None, idenEig]
             )
             # save scaling dimensions
@@ -388,13 +388,13 @@ def linRG2scaleD(scheme="hotrg3d", ver="base", pars={},
                           "Lattice-reflection (000) sector")
                     print("    ", scDims000[0])
                     print("    Expected values from CFT arguments are")
-                    print("    ", [0, 1.413, 3, 3, 3.413, 3.413, 3.413])
+                    print("    ", [0, 1.413, 3, 3, 3.413, 3.413, 3.413, 3.830])
                     print("    ---")
                     print("    ",
                           "Lattice-reflection (100), (010) and (001) sector")
                     print("    ", scDims100[0], scDims010[0], scDims001[0])
                     print("    Expected values from CFT arguments are all")
-                    print("    ", [2.413, 4, 4])
+                    print("    ", [2.413, 4, 4, 4])
                     print("    ---")
                     print("    ",
                           "Lattice-reflection (110), (101) and (011) sector")
@@ -409,19 +409,20 @@ def linRG2scaleD(scheme="hotrg3d", ver="base", pars={},
                           "Lattice-reflection (000) sector")
                     print("    ", scDims000[1])
                     print("    Expected values from CFT arguments are")
-                    print("    ", [0.518, 2.518, 2.518, 2.518, 4.518])
+                    print("    ", [0.518, 2.518, 2.518, 2.518, 4.180, 4.180,
+                                   4.518])
                     print("    ---")
                     print("    ",
                           "Lattice-reflection (100), (010) and (001) sector")
                     print("    ", scDims100[1], scDims010[1], scDims001[1])
                     print("    Expected values from CFT arguments are all")
-                    print("    ", [1.518, 3.518, 3.518, 3.518])
+                    print("    ", [1.518, 3.518, 3.518, 3.518, 4.518])
                     print("    ---")
                     print("    ",
                           "Lattice-reflection (110), (101) and (011) sector")
                     print("    ", scDims110[1], scDims101[1], scDims011[1])
                     print("    Expected values from CFT arguments are all")
-                    print("    ", [2.518, 4.518])
+                    print("    ", [2.518, 4.180, 4.518])
             print("\\--------------------/")
             print()
 
