@@ -476,18 +476,21 @@ class TensorNetworkRG2D(TensorNetworkRG):
             ten_cur = trg2d.contr4pieces(t1, t2, t3, t4)
             if display:
                 print("  TRG-{:d} done!".format(n+1))
+                print("Shape of the tensor A is")
+                print("  {} ({})".format(ten_cur.shape, ten_cur.qhape))
                 print("------")
-        if display:
-            scur = self.singlular_spectrum()
-            print("The singular value spectrum of A is:")
-            print(scur[:20])
-            print("===========================")
 
         # update the current tensor
         self.current_tensor = ten_cur * 1.0
         # pull out the tensor norm and save
         ten_mag = self.pullout_magnitude()
         self.save_tensor_magnitude(ten_mag)
+
+        if display:
+            scur = self.singlular_spectrum()
+            print("The singular value spectrum of A is:")
+            print(scur[:20])
+            print("===========================")
 
         # there is no entanglement filtering
         lrerr = 0
