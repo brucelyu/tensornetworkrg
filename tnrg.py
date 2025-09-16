@@ -12,7 +12,11 @@ import numpy as np
 from abeliantensors import TensorZ2, Tensor
 from ncon import ncon
 from .initial_tensor import initial_tensor
-from .coarse_grain_2d import trg_evenbly, tnr_evenbly, hotrg, block_rotsym, block_grl
+from .coarse_grain_2d import (
+    trg_evenbly, tnr_evenbly,
+    hotrg, block_rotsym, block_grl,
+    looptnr_rotsym
+)
 from .coarse_grain_2d import hotrg_grl as hotrg2d
 from .coarse_grain_2d import trg as trg2d
 from .coarse_grain_2d import signfix as sf2d
@@ -63,6 +67,7 @@ class TensorNetworkRG:
         self.isometry_applied = None
         self.exact_free_energy = 0
         self.boundary = None
+        self.z = None
 
     # fetch instance properties #
     # ------------------------- #
@@ -83,6 +88,15 @@ class TensorNetworkRG:
         return current tensor
         """
         return self.current_tensor.copy()
+
+    def get_bondMat(self):
+        """return current bond matrix z
+        """
+        if self.z is None:
+            return None
+        else:
+            return self.z.copy()
+
 
     def get_tensor_magnitude(self):
         """
@@ -916,6 +930,70 @@ class TensorNetworkRG2D(TensorNetworkRG):
             print(scur[:20])
             print("===========================")
 
+        return lrerr, SPerrs
+
+    def efrg_loopOpt(
+        self,
+        pars={"chi": 4, "dtol": 1e-16, "display": True},
+    ):
+        """EFRG with loop-TNR like EF process
+        Both the lattice reflection and rotation symmetries
+        are exploited and imposed.
+        This scheme supports bond matrix z on the square TN
+        """
+        if self.iter_n == 0:
+            # In this scheme, a pair of two isometries
+            # has opposite arrow for input legs
+            self.init_dw()
+            self.boundary = "anti-parallel"
+
+        # read parameters for the block-tensor part
+        chi = pars["chi"]
+        cg_eps = pars["dtol"]
+        display = pars["display"]
+
+        # ----------------------------
+        # Do the tensor RG map
+        ten_cur = self.get_tensor()
+        z_cur = self.get_bondMat()
+        if display:
+            print("///////////////////////////")
+        # Step 1. Using TRG to split the current tensor
+        # as the initialization of the loop optimzation approximation
+        v, Lambda, errTRG = looptnr_rotsym.init_trg(ten_cur, chi, cg_eps)
+
+        # Step 2. Update v and Λ using loop optimzation
+        # TODO
+        lrerr = 0    # no entanglement filtering error
+
+        # Step 3. Perform a TRG-like block-tensor map
+        # 3.1 Determine the isometric tensor p
+        #     -- build the density matrix ρ for p
+        rho = looptnr_rotsym.densityM(v, Lambda, z_cur)
+        #     -- diagonalize ρ to find p
+        p, g, errp, eigvp = looptnr_rotsym.findProj(
+            rho, chi, cg_eps
+        )
+        # 3.2 contract v, Λ, p and z to get the new 4-leg tensor
+        C = looptnr_rotsym.buildC(v, p, z_cur)
+        Ap = looptnr_rotsym.C2Ap(C, Lambda)
+        # 3.3 calculate the new bond matrix z
+        if z_cur is not None:
+            self.z = ncon([p.conj(), p, z_cur, z_cur],
+                          [[1, 4, -1], [3, 2, -2], [1, 3], [2, 4]]
+                          )
+
+        # Final steps:
+        # -- update the current tensor
+        self.current_tensor = Ap * 1.0
+        # -- pull out the tensor norm and save
+        ten_mag = self.pullout_magnitude()
+        self.save_tensor_magnitude(ten_mag)
+        # -- save isometric tensors and SWAP signs
+        self.isometry_applied = [p, p.conj()]  # x and y directions
+        self.gSWAP = g * 1.0
+        # return errors
+        SPerrs = [errp, errp]
         return lrerr, SPerrs
 
     def rgmap(self, tnrg_pars,

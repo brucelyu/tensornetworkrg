@@ -34,6 +34,8 @@ A[x, y, x', y']
       y'
 """
 from .block_rotsym import l1Split
+from ncon import ncon
+import numpy as np
 
 
 # I. Initialize the tensors composing the loop using a local TRG split
@@ -47,19 +49,118 @@ def init_trg(A, chi, eps):
     return v, Lambda, err
 
 
+# II. Determine the isometric tensor p
+def densityM(v, Lambda, z=None):
+    """Construct the density matrix for the isometry p
+
+    Args:
+        v (TensorCommon): 3-leg tensor with real values
+        Lambda (TensorCommon): a matrix with real values
+
+    Returns:
+        rho (TensorCommon): 4-leg density matrix
+
+    """
+    vLmd = ncon([v, Lambda.conj()], [[-1, -2, 1], [-3, 1]])
+    if z is None:
+        # trivial bond matrix in the square-lattice TN
+        rho = ncon([vLmd.conj(), vLmd, vLmd, vLmd.conj()],
+                   [[1, -1, 5], [1, -2, 6], [3, -3, 5], [3, -4, 6]])
+    else:
+        # non-trivial bond matrix in the square-lattice TN
+        rho = ncon([vLmd.conj(), vLmd, vLmd, vLmd.conj(), z, z.conj()],
+                   [[1, -1, 5], [2, -2, 6], [3, -3, 5], [4, -4, 6],
+                    [1, 2], [3, 4]]
+                   )
+    return rho
 
 
+def findProj(rho, chi, cg_eps=1e-10):
+    """find the isometry p
+
+    Args:
+        rho (TensorCommon): density matrix for p
+        chi (int): the bond dimension χ
+
+    Kwargs:
+        cg_eps (float):
+            a numerical precision control for coarse graining process
+            eigenvalues small than cg_eps will be thrown away
+            regardless of χ
+
+    Returns:
+        p (TensorCommon): 3-leg isometric tensor p[ij o]
+            The first two indices i,j are "in"
+            The last one o is "out"
+        g (array): SWAP sign
+        err (float): error for truncation
+        eigv (TensorCommon): eigenvalues
+
+    """
+    # Simontaneously diagonalize rho and the SWAP matrix
+    # construct the SWAP matrix
+    if rho.dirs is not None:
+        # for abeliantensors
+        eyeMat = rho.eye(
+            rho.shape[0], qim=rho.qhape[0]
+        )
+        eyeMat.dirs = [1, 1]
+    else:
+        # for normal tensors
+        eyeMat = rho.eye(rho.shape[0])
+    SWAP = ncon([eyeMat, eyeMat.conj()], [[-1, -4], [-2, -3]])
+    if SWAP.dirs is not None:
+        SWAP.dirs = rho.dirs.copy()
+    # perturb the density matrix ρ
+    rhoP = rho + SWAP * cg_eps * 1e-2
+    eigv, p, err = rhoP.eig(
+        [0, 1], [2, 3], hermitian=True,
+        chis=[i+1 for i in range(chi)], eps=cg_eps,
+        trunc_err_func=trunc_err_func,
+        return_rel_err=True
+    )
+
+    # calculate the SWAP eigenvalues
+    g = ncon([p.conj(), p.conj()], [[1, 2, -1], [2, 1, -2]])
+    g = g.diag()
+    return p, g, err, eigv.abs()
 
 
+# III. Perform the TRG-like block-tensor map
+def buildC(v, p, z=None):
+    """build 3-leg tensor C
+    for the TRG-like block-tensor map
+    """
+    if z is None:
+        # trivial bond matrix in the square-lattice TN
+        C = ncon([v.conj(), v, p.conj()],
+                 [[1, 2, -1], [1, 3, -2], [2, 3, -3]]
+                 )
+    else:
+        # non-trivial bond matrix in the square-lattice TN
+        C = ncon([v.conj(), v, z, p.conj()],
+                 [[1, 3, -1], [2, 4, -2], [1, 2], [3, 4, -3]]
+                 )
+    return C
 
 
+def C2Ap(C, Lambda):
+    """build A' from C and Λ
+    """
+    Ct = ncon([C, Lambda], [[1, -2, -3], [-1, 1]])
+    Ch = ncon([C, Lambda.conj()], [[-1, 1, -3], [-2, 1]])
+    Ap = ncon([Ct, Ch.conj(), Ct, Ch.conj()],
+              [[3, 1, -1], [3, 2, -2], [4, 2, -3], [4, 1, -4]]
+              )
+    return Ap
 
 
-
-
-
-
-
-
+def trunc_err_func(eigv, chi):
+    """
+    No need to take square since we work with M M'
+    whose eigenvalues are themself square of singular values of M
+    """
+    res = np.sum(np.abs(eigv[chi:])) / np.sum(np.abs(eigv))
+    return res
 
 # end of file
