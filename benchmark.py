@@ -39,7 +39,7 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
     elif scheme == "tnr":
         init_dirs = [1, 1, 1, 1]
     elif scheme in ["block", "efrg"]:
-        if ver in ["rotsym", "rotsymTRG"]:
+        if ver in ["rotsym", "rotsymTRG", "loop-rotsym"]:
             init_dirs = [1, -1, 1, -1]
         elif ver == "reflsym":
             init_dirs = [1, 1, -1, -1]
@@ -131,6 +131,8 @@ def benm2DIsing(relT=1.0, h=0, isCrit=True,
             tnrg_pars = {"chi": chi, "chiIn": chiIn, "dtol": dtol,
                          "display": True,
                          "chis": chis, "chienv": chienv, "epsilon": EFepsilon}
+        elif ver == "loop-rotsym":
+            tnrg_pars = {"chi": chi, "dtol": dtol, "display": True}
     else:
         raise NotImplementedError("Not implemented yet")
 

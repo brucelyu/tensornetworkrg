@@ -223,8 +223,10 @@ def isReflSym(A, g=None):
     """
     Areflx = reflect(A, "x", g)
     Arefly = reflect(A, "y", g)
-    isX = Areflx.allclose(A)
-    isY = Arefly.allclose(A)
+    # isX = Areflx.allclose(A)
+    # isY = Arefly.allclose(A)
+    isX = (Areflx - A).norm()
+    isY = (Arefly - A).norm()
     return isX, isY
 
 
@@ -241,7 +243,8 @@ def isRotSym(A, g=None):
 
     """
     Arot = rotate(A, g)
-    isRot = Arot.allclose(A)
+    # isRot = Arot.allclose(A)
+    isRot = (Arot - A).norm()
     return isRot
 
 

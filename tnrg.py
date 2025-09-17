@@ -992,6 +992,31 @@ class TensorNetworkRG2D(TensorNetworkRG):
         # -- save isometric tensors and SWAP signs
         self.isometry_applied = [p, p.conj()]  # x and y directions
         self.gSWAP = g * 1.0
+
+        # print out info
+        if display:
+            print("The block-tensor map errors are")
+            print("  - Error (out) = {:.2e}".format(errp))
+            print("     - The TRG splitting error is {:.2e}".format(errTRG))
+            print("-------")
+            print("Eigenvalue spectrum of the TRG bond Λ is")
+            eigvLbd = Lambda.eig([0], [1], hermitian=True)[0]
+            eigvLbd = eigvLbd / eigvLbd.max()
+            self.printArray(eigvLbd)
+            print("-------")
+            if z_cur is not None:
+                print("Eigenvalue spectrum of the bond matrix z is")
+                eigvz = z_cur.eig([0], [1], hermitian=True)[0]
+                self.printArray(eigvz)
+            print("-------")
+            # Check the symmetry of the coarse-grained tensor
+            print("Check symmetry of the coarse-grained tensor:")
+            isreflx, isrefly = block_rotsym.isReflSym(Ap/Ap.norm(), g)
+            print("  - Reflection: ({:.2e}, {:.2e})".format(isreflx, isrefly))
+            print("  - Rotation  : {:.2e}".format(
+                block_rotsym.isRotSym(Ap/Ap.norm(), g)
+            ))
+            print("===========================")
         # return errors
         SPerrs = [errp, errp]
         return lrerr, SPerrs
@@ -1071,6 +1096,12 @@ class TensorNetworkRG2D(TensorNetworkRG):
                  ) = self.efrg_reflsym(tnrg_pars,
                                        signFix=signFix,
                                        isFixChi=isFixChi)
+            elif ver == "loop-rotsym":
+                # using loop-tnr-like EF process and
+                # presever the rotation and reflection symmetry
+                (lferrs,
+                 SPerrs
+                 ) = self.efrg_loopOpt(tnrg_pars)
         return lferrs, SPerrs
 
     def init_dw(self):
@@ -1103,6 +1134,12 @@ class TensorNetworkRG2D(TensorNetworkRG):
                        [[1, 2, 3, 4], [1, -1], [3, -3],
                         [2, -2], [4, -4]])
         return ten_new
+
+    @staticmethod
+    def printArray(eigArr):
+        eigArr = eigArr.to_ndarray()
+        eigArr = -np.sort(-np.abs(eigArr))
+        print(eigArr[:20])
 
     def gu_wen_cardy(self, aspect_ratio=1, num_scale=12,
                      indId=0, onlyTMeig=False, isSparse=True):
