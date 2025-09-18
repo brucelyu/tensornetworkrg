@@ -112,7 +112,7 @@ def findProj(rho, chi, cg_eps=1e-10):
     if SWAP.dirs is not None:
         SWAP.dirs = rho.dirs.copy()
     # perturb the density matrix ρ
-    rhoP = rho + SWAP * 1e-10
+    rhoP = rho + SWAP * 1e-9
     eigv, p, err = rhoP.eig(
         [0, 1], [2, 3], hermitian=True,
         chis=[i+1 for i in range(chi)], eps=cg_eps,
