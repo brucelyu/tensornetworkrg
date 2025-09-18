@@ -11,7 +11,7 @@ import scipy.stats as spstats
 import numpy as np
 from abeliantensors import TensorZ2, Tensor
 from ncon import ncon
-from .initial_tensor import initial_tensor
+from .initial_tensor import initial_tensor, initial_bondz
 from .coarse_grain_2d import (
     trg_evenbly, tnr_evenbly,
     hotrg, block_rotsym, block_grl,
@@ -167,6 +167,10 @@ class TensorNetworkRG:
         self.current_tensor = init_ten / init_ten.norm()
         if self.model == "ising2d" and onsite_symmetry:
             self.current_tensor.dirs = init_dirs
+        # for the bond matrix z
+        init_bondz = initial_bondz(self.model, self.model_parameters, scheme)
+        if init_bondz is not None:
+            self.z = init_bondz * 1.0
 
     def generate_cdl(self, cornerChi=2, isZ2=False):
         cdl, loop, cmat = toymodels.cdlten(cornerChi, isZ2)
@@ -979,15 +983,22 @@ class TensorNetworkRG2D(TensorNetworkRG):
         Ap = looptnr_rotsym.C2Ap(C, Lambda)
         # 3.3 calculate the new bond matrix z
         if z_cur is not None:
-            self.z = ncon([p.conj(), p, z_cur, z_cur],
-                          [[1, 4, -1], [3, 2, -2], [1, 3], [2, 4]]
-                          )
+            zp = ncon([p.conj(), p, z_cur, z_cur],
+                      [[1, 4, -1], [3, 2, -2], [1, 3], [2, 4]]
+                      )
+            # symmetrize zp (as it should be)
+            zp = 0.5 * (zp + zp.transpose([1, 0]).conj())
 
         # Final steps:
         # -- update the current tensor
         self.current_tensor = Ap * 1.0
         # -- pull out the tensor norm and save
         ten_mag = self.pullout_magnitude()
+        if z_cur is not None:
+            zp_mag = zp.norm()
+            self.z = zp / zp_mag
+            # TODO: think more about the following line...
+            ten_mag = ten_mag * zp_mag**2
         self.save_tensor_magnitude(ten_mag)
         # -- save isometric tensors and SWAP signs
         self.isometry_applied = [p, p.conj()]  # x and y directions
@@ -1001,13 +1012,18 @@ class TensorNetworkRG2D(TensorNetworkRG):
             print("-------")
             print("Eigenvalue spectrum of the TRG bond Λ is")
             eigvLbd = Lambda.eig([0], [1], hermitian=True)[0]
-            eigvLbd = eigvLbd / eigvLbd.max()
+            eigvLbd = eigvLbd / eigvLbd.abs().max()
             self.printArray(eigvLbd)
             print("-------")
             if z_cur is not None:
                 print("Eigenvalue spectrum of the bond matrix z is")
                 eigvz = z_cur.eig([0], [1], hermitian=True)[0]
+                eigvz = eigvz / eigvz.abs().max()
                 self.printArray(eigvz)
+            print("-------")
+            print("The Projective Trunction spectrum for p is:")
+            eigvpArr = eigvp / eigvp.max()
+            self.printArray(eigvpArr)
             print("-------")
             # Check the symmetry of the coarse-grained tensor
             print("Check symmetry of the coarse-grained tensor:")
@@ -1138,7 +1154,8 @@ class TensorNetworkRG2D(TensorNetworkRG):
     @staticmethod
     def printArray(eigArr):
         eigArr = eigArr.to_ndarray()
-        eigArr = -np.sort(-np.abs(eigArr))
+        # eigArr = -np.sort(-np.abs(eigArr))
+        eigArr = np.array(sorted(eigArr, key=lambda ele: -abs(ele)))
         print(eigArr[:20])
 
     def gu_wen_cardy(self, aspect_ratio=1, num_scale=12,

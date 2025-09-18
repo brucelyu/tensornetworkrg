@@ -48,6 +48,17 @@ def initial_tensor(model, model_parameters, is_sym=False,
     return res
 
 
+def initial_bondz(model, model_parameters, scheme):
+    bondz = None
+    if model == "hardsquare1NN" and scheme == "trgRsym":
+        z = model_parameters["activity"]
+        if z < 0:
+            bondz = Tensor.zeros([2, 2])
+            bondz[0, 0] = 1
+            bondz[1, 1] = -1
+    return bondz
+
+
 def ising_2d(beta=0.4, ext_h=0, is_sym=False):
     """
     init_ten = ising_2d(beta,ext_h,is_sym).
@@ -203,7 +214,7 @@ def hardDisk_sqlat1NN(z, scheme="IRF"):
         A (Tensor): a 4-leg tensor
 
     """
-    assert scheme in ["IRF", "trg", "trgR"]
+    assert scheme in ["IRF", "trg", "trgR", "trgRsym"]
     if scheme == "IRF":
         # The copydot tensor
         # We put the activity z on this dot
@@ -241,6 +252,8 @@ def hardDisk_sqlat1NN(z, scheme="IRF"):
         # rotate A[x, x', y, y'] to A[x, y, x', y']
         A = A.transpose([0, 2, 1, 3])
     elif scheme == "trg":
+        # This representation has both the rotation and reflection symmetry
+        # It becomes complex when the activity is negative
         # The 3-leg copy dot tensor
         c = Tensor.zeros([2, 2, 2])
         # The 1NN matrix
@@ -281,6 +294,22 @@ def hardDisk_sqlat1NN(z, scheme="IRF"):
         W[0, 1] = 1
         # This initial tensor has bond dimension 2
         A = ncon([cp, cp, cm, cm, W, W, W, W], [
+            [2, 7, -1], [1, 5, -2], [3, 8, -3], [4, 6, -4],
+            [1, 2], [5, 8], [3, 4], [7, 6]
+        ])
+    elif scheme == "trgRsym":
+        # This rea representation has both the rotation and reflection symmetry
+        # The 3-leg copy dot tensor
+        cp = Tensor.zeros([2, 2, 2])
+        cp[0, 0, 0] = 1
+        cp[1, 1, 1] = np.sqrt(np.abs(z))
+        # The 1NN matrix
+        W = Tensor.zeros([2, 2])
+        W[0, 0] = 1
+        W[1, 0] = 1
+        W[0, 1] = 1
+        # This initial tensor has bond dimension 2
+        A = ncon([cp, cp, cp, cp, W, W, W, W], [
             [2, 7, -1], [1, 5, -2], [3, 8, -3], [4, 6, -4],
             [1, 2], [5, 8], [3, 4], [7, 6]
         ])
