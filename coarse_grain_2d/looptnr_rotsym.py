@@ -163,4 +163,22 @@ def trunc_err_func(eigv, chi):
     res = np.sum(np.abs(eigv[chi:])) / np.sum(np.abs(eigv))
     return res
 
+
+# IV. Coarse graining the bond matrix z
+def cgz(z, p):
+    znew = ncon([p.conj(), p, z, z],
+                [[1, 4, -1], [3, 2, -2], [1, 3], [2, 4]]
+                )
+    errMsg = "bond matrix should be symmetric!"
+    assert znew.transpose([1, 0]).conj().allclose(znew), errMsg
+    # EVD znew
+    eigvz, Uz = znew.eig([0], [1], hermitian=True)
+    # singular value part
+    zps = eigvz.abs()
+    Hz = Uz.copy()
+    Hz = Hz.multiply_diag(zps.sqrt(), 1, direction="r")
+    # Obtain zp
+    zp = eigvz.sign().diag()    # dirs=[1, -1] by default
+    return zp, Hz, zps
+
 # end of file
