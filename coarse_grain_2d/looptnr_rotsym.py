@@ -165,20 +165,59 @@ def trunc_err_func(eigv, chi):
 
 
 # IV. Coarse graining the bond matrix z
-def cgz(z, p):
+def cgz(z, p, g):
     znew = ncon([p.conj(), p, z, z],
                 [[1, 4, -1], [3, 2, -2], [1, 3], [2, 4]]
                 )
     errMsg = "bond matrix should be symmetric!"
     assert znew.transpose([1, 0]).conj().allclose(znew), errMsg
     # EVD znew
-    eigvz, Uz = znew.eig([0], [1], hermitian=True)
+    # eigvz, Uz = znew.eig([0], [1], hermitian=True)
+    P0, P1 = eig4g(g)
+    eigvz, Uz, gnew = eig4Z(znew, P0, P1)
     # singular value part
     zps = eigvz.abs()
     Hz = Uz.copy()
     Hz = Hz.multiply_diag(zps.sqrt(), 1, direction="r")
     # Obtain zp
     zp = eigvz.sign().diag()    # dirs=[1, -1] by default
-    return zp, Hz, zps
+    return zp, Hz, zps, gnew
+
+
+# IV.1 For diagonalzie z and g (SWAP sign)
+def eig4g(g, isdiag=True):
+    """Read off the eigenvector of g
+    """
+    if isdiag:
+        idMat = g.eye(g.shape[0])
+        P0 = idMat[:, g.sign() == 1]
+        P1 = idMat[:, g.sign() == -1]
+    else:
+        pass
+    return P0, P1
+
+
+def eig4Z(z, P0, P1):
+    """Diagonalize z in smaller blocks
+    """
+    ZM0 = P0.T @ z @ P0
+    ZM1 = P1.T @ z @ P1
+    eigvZ0, UZ0 = ZM0.eig([0], [1], hermitian=True)
+    eigvZ1, UZ1 = ZM1.eig([0], [1], hermitian=True)
+    # assemble eigenvectors
+    U = z.zeros(z.shape)
+    N0 = P0.shape[1]
+    N1 = P1.shape[1]
+    U[:, :N0] = P0 @ UZ0
+    U[:, N0:] = P1 @ UZ1
+    # assemble eigenvalues
+    eigv = z.zeros(z.shape[0])
+    eigv[:N0] = eigvZ0 * 1.0
+    eigv[N0:] = eigvZ1 * 1.0
+    # eigenvalues of g in this basis
+    eigvg = z.zeros(z.shape[0])
+    eigvg[:N0] = [1] * N0
+    eigvg[N0:] = [-1] * N1
+    return eigv, U, eigvg
 
 # end of file

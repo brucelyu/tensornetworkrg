@@ -984,8 +984,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
         # 3.3 calculate the new bond matrix z
         if z_cur is not None:
             # coarse graining of bond matrix z
-            # TODO: The SWAP gauge matrix also needs to be modified
-            zp, Hz, zps = looptnr_rotsym.cgz(z_cur, p)
+            zp, Hz, zps, g = looptnr_rotsym.cgz(z_cur, p, g)
             self.z = zp * 1.0
             # absorb Hz (contain singular values)
             # into the 4-leg tensor Ap
