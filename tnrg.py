@@ -67,6 +67,7 @@ class TensorNetworkRG:
         self.isometry_applied = None
         self.exact_free_energy = 0
         self.boundary = None
+        self.gSWAP = None
         self.z = None
 
     # fetch instance properties #
@@ -1022,6 +1023,8 @@ class TensorNetworkRG2D(TensorNetworkRG):
             print("The Projective Trunction spectrum for p is:")
             eigvpArr = eigvp / eigvp.max()
             self.printArray(eigvpArr)
+            print("SWAP gauge matrix is")
+            print(g)
             print("-------")
             # Check the symmetry of the coarse-grained tensor
             print("Check symmetry of the coarse-grained tensor:")
@@ -1167,13 +1170,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
                          (k + 1) % aspect_ratio + 1, -(k + 1)
                           ] for k in range(aspect_ratio)
                          ]
-        ten_cur = self.get_tensor()
-        if self.boundary == "anti-parallel" and self.iter_n > 0:
-            v, w = self.isometry_applied.copy()
-            Hgauge = ncon([v, v], [[1, 2, -1], [2, 1, -2]])
-            Vgauge = ncon([w, w], [[1, 2, -1], [2, 1, -2]])
-            ten_cur = ncon([ten_cur, Hgauge, Vgauge],
-                           [[1, 2, -3, -4], [1, -1], [2, -2]])
+        ten_cur = self.absorbBondMat()
         ten_mag = self.get_tensor_magnitude()[-1]
         ten_inv = ten_mag**(-1/3) * ten_cur
         transfer_mat = ncon([ten_inv]*aspect_ratio,
@@ -1264,15 +1261,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
     def generate_tm(self, direction="y"):
         # generate transfer matrix in x or y direction
         assert direction in ["x", "y"]
-        ten_cur = self.get_tensor()
-        if self.boundary == "anti-parallel":
-            # we need to take care of
-            # the gauge matrices on bonds
-            v, w = self.isometry_applied.copy()
-            Hgauge = ncon([v, v], [[1, 2, -1], [2, 1, -2]])
-            Vgauge = ncon([w, w], [[1, 2, -1], [2, 1, -2]])
-            ten_cur = ncon([ten_cur, Hgauge, Vgauge],
-                           [[1, 2, -3, -4], [1, -1], [2, -2]])
+        ten_cur = self.absorbBondMat()
         # construct the transfer matrix
         if direction == "x":
             tm = ncon([ten_cur], [[-1, 1, -2, 1]])
@@ -1281,6 +1270,25 @@ class TensorNetworkRG2D(TensorNetworkRG):
         else:
             raise ValueError("The direction should be among x or y")
         return tm
+
+    def absorbBondMat(self):
+        """apply the bond matrix to the bulk tensor
+        It is for rotational symmetric schemes
+        """
+        ten_cur = self.get_tensor()
+        if self.boundary == "anti-parallel":
+            # we need to take care of
+            # the gauge matrices on bonds
+            if (self.z is None):
+                v, w = self.isometry_applied.copy()
+                Hgauge = ncon([v, v], [[1, 2, -1], [2, 1, -2]])
+                Vgauge = ncon([w, w], [[1, 2, -1], [2, 1, -2]])
+            elif (self.gSWAP is not None):
+                Hgauge = (self.gSWAP * self.z.diag()).diag()
+                Vgauge = Hgauge * 1.0
+            ten_cur = ncon([ten_cur, Hgauge, Vgauge],
+                           [[1, 2, -3, -4], [1, -1], [2, -2]])
+        return ten_cur
 
     def degIndX(self, direction="y"):
         tm = self.generate_tm(direction=direction)
