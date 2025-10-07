@@ -53,9 +53,9 @@ def initial_bondz(model, model_parameters, scheme):
     if model == "hardsquare1NN" and scheme == "trgRsym":
         z = model_parameters["activity"]
         if z < 0:
-            bondz = Tensor.zeros([2, 2])
-            bondz[0, 0] = 1
-            bondz[1, 1] = -1
+            bondz = Tensor.zeros(2)
+            bondz[0] = 1
+            bondz[1] = -1
     return bondz
 
 

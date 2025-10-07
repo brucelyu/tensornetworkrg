@@ -15,7 +15,7 @@ from .initial_tensor import initial_tensor, initial_bondz
 from .coarse_grain_2d import (
     trg_evenbly, tnr_evenbly,
     hotrg, block_rotsym, block_grl,
-    looptnr_rotsym
+    looptnr_rotsym, trg_rotsym
 )
 from .coarse_grain_2d import hotrg_grl as hotrg2d
 from .coarse_grain_2d import trg as trg2d
@@ -937,6 +937,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
 
         return lrerr, SPerrs
 
+    # TODO: the loop optimization is not yet implemented
     def efrg_loopOpt(
         self,
         pars={"chi": 4, "dtol": 1e-16, "display": True},
@@ -1038,6 +1039,70 @@ class TensorNetworkRG2D(TensorNetworkRG):
         SPerrs = [errp, errp]
         return lrerr, SPerrs
 
+    def trg_loopOpt(
+        self,
+        pars={"chi": 4, "dtol": 1e-16, "display": True},
+        isloopOpt=False,
+    ):
+        """TRG with loop-TNR like EF process
+        Both the lattice reflection and rotation symmetries
+        are exploited and imposed.
+        This scheme naturually supports bond matrix z on the square TN
+        """
+        if self.iter_n == 0:
+            # In this scheme, a pair of two isometries
+            # has opposite arrow for input legs
+            self.init_dw()
+            self.boundary = "anti-parallel-trg"
+
+        # read parameters for the block-tensor part
+        chi = pars["chi"]
+        cg_eps = pars["dtol"]
+        display = pars["display"]
+
+        # ----------------------------
+        # Do the tensor RG map
+        ten_cur = self.get_tensor()
+        z_cur = self.get_bondMat()
+        if display:
+            print("///////////////////////////")
+        # Step 1. Using TRG to split the current tensor
+        # as the initialization of the loop optimzation approximation
+        vL, bondzp, errTRG, sval = trg_rotsym.init_trg(ten_cur, chi, cg_eps)
+
+        # Step 2. Update vL using loop optimzation
+        # TODO
+        lrerr = 0    # no entanglement filtering error
+
+        # Step 3. Perform the TRG contraction
+        Ap = trg_rotsym.contrvLz(vL, z_cur)
+
+        # Final steps:
+        # -- update the current tensor
+        self.current_tensor = Ap * 1.0
+        # -- update the bond matrix
+        self.z = bondzp * 1.0
+        # -- pull out the tensor norm and save
+        ten_mag = self.pullout_magnitude()
+        self.save_tensor_magnitude(ten_mag)
+
+        # print out info
+        if display:
+            print("The TRG splitting error is {:.2e}".format(errTRG))
+            print("  -- About the bond matrix z:")
+            if (bondzp.to_ndarray() == 1).all():
+                print("  It is trivally all 1!")
+            else:
+                print(bondzp)
+            print("  -- Singular values of A diagonally is")
+            sArr = sval / sval.max()
+            self.printArray(sArr)
+
+
+
+        # return errors
+        return lrerr, errTRG
+
     def rgmap(self, tnrg_pars,
               scheme="fet-hotrg", ver="base",
               signFix=False, isFixChi=False):
@@ -1081,6 +1146,10 @@ class TensorNetworkRG2D(TensorNetworkRG):
                 (lferrs,
                  SPerrs
                  ) = self.trg_grl(tnrg_pars)
+            elif ver == "rotsym":
+                (lferrs,
+                 SPerrs
+                 ) = self.trg_loopOpt(tnrg_pars, isloopOpt=False)
         elif scheme == "block":
             if ver == "rotsym":
                 (lferrs,
