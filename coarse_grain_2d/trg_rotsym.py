@@ -45,7 +45,7 @@ def init_trg(A, chi, eps):
     # to the isometric tensor v
     vL = v.copy()
     vL = vL.multiply_diag(s.sqrt(), 2, direction="r")
-    return vL, bondzp, err, s
+    return vL, bondzp, err, s, v
 
 
 def contrvLz(vL, bondz=None):

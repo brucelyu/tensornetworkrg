@@ -1053,7 +1053,8 @@ class TensorNetworkRG2D(TensorNetworkRG):
             # In this scheme, a pair of two isometries
             # has opposite arrow for input legs
             self.init_dw()
-            self.boundary = "anti-parallel-trg"
+            if isloopOpt is False:
+                self.boundary = "anti-parallel"
 
         # read parameters for the block-tensor part
         chi = pars["chi"]
@@ -1064,31 +1065,41 @@ class TensorNetworkRG2D(TensorNetworkRG):
         # Do the tensor RG map
         ten_cur = self.get_tensor()
         z_cur = self.get_bondMat()
+        lrerr = 0    # no entanglement filtering error
         if display:
             print("///////////////////////////")
-        # Step 1. Using TRG to split the current tensor
-        # as the initialization of the loop optimzation approximation
-        vL, bondzp, errTRG, sval = trg_rotsym.init_trg(ten_cur, chi, cg_eps)
+        Ap = ten_cur * 1.0
+        zp = z_cur * 1.0
+        SPerrList = []
+        for n in range(2):
+            # Step 1. Using TRG to split the current tensor
+            # as the initialization of the loop optimzation approximation
+            vL, bondzp, errTRG, sval, v = trg_rotsym.init_trg(Ap, chi, cg_eps)
+            SPerrList.append(errTRG)
 
-        # Step 2. Update vL using loop optimzation
-        # TODO
-        lrerr = 0    # no entanglement filtering error
+            # Step 2. Update vL using loop optimzation
+            # TODO
 
-        # Step 3. Perform the TRG contraction
-        Ap = trg_rotsym.contrvLz(vL, z_cur)
+            # Step 3. Perform the TRG contraction
+            Ap = trg_rotsym.contrvLz(vL, zp)
+            zp = bondzp * 1.0
 
         # Final steps:
         # -- update the current tensor
         self.current_tensor = Ap * 1.0
         # -- update the bond matrix
-        self.z = bondzp * 1.0
+        self.z = zp * 1.0
         # -- pull out the tensor norm and save
         ten_mag = self.pullout_magnitude()
         self.save_tensor_magnitude(ten_mag)
+        if self.boundary == "anti-parallel":
+            # save the v tensor in TRG splitting
+            self.isometry_applied = [v, v.conj()]  # x and y directions
 
         # print out info
         if display:
-            print("The TRG splitting error is {:.2e}".format(errTRG))
+            print("The TRG splitting error is {:.2e} and {:.2e}".format(
+                SPerrList[0], SPerrList[1]))
             print("  -- About the bond matrix z:")
             if (bondzp.to_ndarray() == 1).all():
                 print("  It is trivally all 1!")
@@ -1354,6 +1365,11 @@ class TensorNetworkRG2D(TensorNetworkRG):
                 Vgauge = ncon([w, w], [[1, 2, -1], [2, 1, -2]])
             elif (self.gSWAP is not None):
                 Hgauge = (self.gSWAP * self.z.diag()).diag()
+                Vgauge = Hgauge * 1.0
+            else:
+                v, w = self.isometry_applied.copy()
+                gSWAP = ncon([v, v], [[1, 2, -1], [2, 1, -2]])
+                Hgauge = ncon([gSWAP, self.z.diag()], [[-1, 1], [1, -2]])
                 Vgauge = Hgauge * 1.0
             ten_cur = ncon([ten_cur, Hgauge, Vgauge],
                            [[1, 2, -3, -4], [1, -1], [2, -2]])
