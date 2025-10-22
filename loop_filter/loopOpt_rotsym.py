@@ -33,7 +33,11 @@ while the order of ij for vL depends on the direction of
 the arrow on its TN diagram.
 """
 from ncon import ncon
+from .. import u1ten
 
+
+# Part I: Functions for building environment tensors
+# for updating the vL tensor and calculating fidelity F
 
 def multizp2vL(vL, zp):
     """multiply zp on the 3rd leg of vL
@@ -117,6 +121,7 @@ def multiz2dbA(dbA, z):
     return dbAz
 
 
+# -- Build Υ tensor
 def vL2Upsilon(vL, zp, z):
     """build the Υ tensor from vL and bond matrices
 
@@ -146,6 +151,7 @@ def vL2Upsilon(vL, zp, z):
     return Upsilon
 
 
+# -- Build Q tensor
 def vL2Q(vL, zp, z, A):
     """build the Q tensor
 
@@ -176,6 +182,7 @@ def vL2Q(vL, zp, z, A):
     return Q
 
 
+# -- Calculate the overlap of the original plaquette: <ψ|ψ>
 def A2PsiPsi(A, z):
     """calculate the overlap <ψ|ψ>
     For computing the fidelity of the loop optimization
@@ -196,6 +203,94 @@ def A2PsiPsi(A, z):
     quadrAz = ncon([dbAz, dbA.conj()], [[1, 2, -1, -2], [1, 2, -3, -4]])
     PsiPsi = ncon([quadrAz]*2, [[1, 2, 3, 4], [3, 4, 1, 2]])
     return PsiPsi
+
+
+# -- Calculate the fidelity
+def fidelity(vL, zp, z, A):
+    Upsilon = vL2Upsilon(vL, zp, z)
+    Q = vL2Q(vL, zp, z, A)
+    # calculate <Φ|Φ>
+    PhiPhi = ncon([Upsilon, vL, vL.conj()],
+                  [[1, 2, 3, 4], [5, 1, 2], [5, 3, 4]])
+    # calculate <Φ|Ψ>
+    PhiPsi = ncon([Q.conj(), vL],
+                  [[1, 2, 3], [3, 1, 2]])
+    # calculate <Ψ|Ψ>
+    PsiPsi = A2PsiPsi(A, z)
+    # calculate fidelity = |<Φ|Ψ>|^2 / (<Φ|Φ> <Ψ|Ψ>)
+    f = PhiPsi * PhiPsi.conj() / (PhiPhi * PsiPsi)
+    return f, 1 - f, Upsilon, Q
+
+
+# Part II: Functions for the optimization of vL tensor
+def propose_vL(Upsilon, Q, eps_pinv=1e-8):
+    """propose a candidate as an updated vL
+    for optimizing the fideltiy
+
+    Args:
+        Upsilon (TensorCommon): 4-leg tensor
+        Q (TensorCommon): 3-leg tensor
+
+    Kwargs:
+        eps_pinv (float):
+            threshold below which the eigenvalues
+            are considered as zero
+
+    Returns:
+        vLp (TensorCommon): 3-leg tensor
+            the candidate as an updated vL
+
+    """
+    Upsilon_inv = u1ten.pinv(
+        Upsilon, [0, 1], [2, 3], eps_mach=eps_pinv
+    )
+    vLp = ncon([Upsilon_inv, Q.conj()], [[-2, -3, 1, 2], [1, 2, -1]])
+    return vLp
+
+
+def update_vL(vL, zp, z, A, eps_pinv=1e-8,
+              eps_errEF=1e-10):
+    """update vL for optimizing the fidelity
+
+    Args:
+        vL (TensorCommon): 3-leg tensor
+        zp (TensorCommon): 1D vector
+            the renormalized bond matrix
+        z (TensorCommon): 1D vector
+            the bond matrix
+        A (TensorCommon): 4-leg tensor
+            the bulk tensor in TN
+
+    Kwargs:
+        eps_pinv (float):
+            threshold below which the eigenvalues
+            are considered as zero
+        eps_errEF (float):
+            threshold below which the EF erro
+            is considered small enough
+
+    Returns:
+        vLnew (TensorCommon): 3-leg tensor
+            the updated vL
+        errNew (float): loop error after the update
+        errOld (float): loop error before the update
+
+    """
+    # calculate old fidelity and construct Υ and P
+    _, errOld, Upsilon, Q = fidelity(vL, zp, z, A)
+    # propose a candidate vL
+    vLp = propose_vL(Upsilon, Q, eps_pinv)
+
+    # try 10 convex combinations of old vL and the proposed vL
+    # to make sure the error goes down
+    # (This idea is taken from Evenbly's TNR codes)
+    for p in range(11):
+        vLnew = (1 - 0.1 * p) * vLp + 0.1 * p * vL
+        # once the error reduces, we exit
+        errNew = fidelity(vLnew, zp, z, A)[1]
+        if (errNew <= errOld) or (errNew < eps_errEF):
+            break
+    return vLnew, errNew, errOld
 
 
 # end of file
