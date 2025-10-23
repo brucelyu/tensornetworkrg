@@ -219,6 +219,7 @@ def fidelity(vL, zp, z, A):
     PsiPsi = A2PsiPsi(A, z)
     # calculate fidelity = |<Φ|Ψ>|^2 / (<Φ|Φ> <Ψ|Ψ>)
     f = PhiPsi * PhiPsi.conj() / (PhiPhi * PsiPsi)
+    f = f.norm()
     return f, 1 - f, Upsilon, Q
 
 
@@ -244,7 +245,8 @@ def propose_vL(Upsilon, Q, eps_pinv=1e-8):
     Upsilon_inv = u1ten.pinv(
         Upsilon, [0, 1], [2, 3], eps_mach=eps_pinv
     )
-    vLp = ncon([Upsilon_inv, Q.conj()], [[-2, -3, 1, 2], [1, 2, -1]])
+    vLpstar = ncon([Upsilon_inv, Q.conj()], [[-2, -3, 1, 2], [1, 2, -1]])
+    vLp = vLpstar.conj()
     return vLp
 
 

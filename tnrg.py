@@ -1069,7 +1069,10 @@ class TensorNetworkRG2D(TensorNetworkRG):
         if display:
             print("///////////////////////////")
         Ap = ten_cur * 1.0
-        zp = z_cur * 1.0
+        if z_cur is not None:
+            zp = z_cur * 1.0
+        else:
+            zp = None
         SPerrList = []
         for n in range(2):
             # Step 1. Using TRG to split the current tensor
