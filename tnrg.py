@@ -1372,8 +1372,8 @@ class TensorNetworkRG2D(TensorNetworkRG):
             else:
                 v, w = self.isometry_applied.copy()
                 gSWAP = ncon([v, v], [[1, 2, -1], [2, 1, -2]])
-                Hgauge = ncon([gSWAP, self.z.diag()], [[-1, 1], [1, -2]])
-                Vgauge = Hgauge * 1.0
+                Vgauge = ncon([gSWAP, self.z.diag()], [[-1, 1], [1, -2]])
+                Hgauge = Vgauge.conj()
             ten_cur = ncon([ten_cur, Hgauge, Vgauge],
                            [[1, 2, -3, -4], [1, -1], [2, -2]])
         return ten_cur
