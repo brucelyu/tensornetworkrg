@@ -25,7 +25,7 @@ from .coarse_grain_3d import block_tensor as bkten3d
 from .coarse_grain_3d import efrg as efrg3d
 from .loop_filter import (
     cleanLoop, toymodels, fet3d, env3d, fet3dcube, fet3dloop,
-    fet2d_rotsym, fet2d_reflsym
+    fet2d_rotsym, fet2d_reflsym, loopOpt_rotsym
 )
 from . import u1ten
 from datetime import datetime
@@ -1041,7 +1041,9 @@ class TensorNetworkRG2D(TensorNetworkRG):
 
     def trg_loopOpt(
         self,
-        pars={"chi": 4, "dtol": 1e-16, "display": True},
+        pars={"chi": 4, "dtol": 1e-16, "display": True,
+              "eps_pinv": 1e-5, "eps_errEF": 1e-12,
+              "LF_max": 50, "LF_min": 5},
         isloopOpt=False,
     ):
         """TRG with loop-TNR like EF process
@@ -1081,7 +1083,33 @@ class TensorNetworkRG2D(TensorNetworkRG):
             SPerrList.append(errTRG)
 
             # Step 2. Update vL using loop optimzation
-            # TODO
+            if isloopOpt and n == 0:
+                eps_pinv = pars["eps_pinv"]
+                eps_errEF = pars["eps_errEF"]
+                LF_max = pars["LF_max"]
+                LF_min = pars["LF_min"]
+                # Initial loop filtering error
+                errLF0 = loopOpt_rotsym.fidelity(
+                    vL, bondzp, zp, Ap
+                )[1]
+                # -- 2.1 Optimizing vL
+                vL, errLF_hist = loopOpt_rotsym.opt_vL(
+                    vL, bondzp, zp, Ap,
+                    eps_pinv, eps_errEF,
+                    iter_max=LF_max, display=True, iter_min=LF_min
+                )
+                # Loop filtering error after the optimization
+                errLF1, PhiPhi1, PsiPsi = loopOpt_rotsym.fidelity(
+                    vL, bondzp, zp, Ap, return_overlap=True
+                )[1:]
+                # print out the Loop filtering error
+                if display:
+                    print("  Initial LF error is {:.3e}".format(errLF0))
+                    print("    Final LF error is {:.3e}".format(errLF1))
+                # -- 2.2 Take care of the norm of vL
+                #        to make sure that <ψ|ψ> = <φ|φ>
+                PsiDivPhi = (PsiPsi / PhiPhi1).norm()
+                vL = vL * (PsiDivPhi)**(1/16)
 
             # Step 3. Perform the TRG contraction
             Ap = trg_rotsym.contrvLz(vL, zp)
@@ -1103,6 +1131,9 @@ class TensorNetworkRG2D(TensorNetworkRG):
         if display:
             print("The TRG splitting error is {:.2e} and {:.2e}".format(
                 SPerrList[0], SPerrList[1]))
+            if isloopOpt:
+                print("The loop optimization error is {:.2e}".format(errLF1))
+
             print("  -- About the bond matrix z:")
             if (bondzp.to_ndarray() == 1).all():
                 print("  It is trivally all 1!")

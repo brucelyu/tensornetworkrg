@@ -206,11 +206,14 @@ def A2PsiPsi(A, z):
 
 
 # -- Calculate the fidelity
-def fidelity(vL, zp, z, A):
+def fidelity(vL, zp, z, A, return_overlap=False):
     Upsilon = vL2Upsilon(vL, zp, z)
     Q = vL2Q(vL, zp, z, A)
-    f = UQ2fid(vL, Upsilon, Q, z, A)
-    return f, 1 - f, Upsilon, Q
+    f, PhiPhi, PsiPsi = UQ2fid(vL, Upsilon, Q, z, A)
+    if not return_overlap:
+        return f, 1 - f, Upsilon, Q
+    else:
+        return f, 1 - f, PhiPhi, PsiPsi
 
 
 def UQ2fid(vL, Upsilon, Q, z, A):
@@ -225,7 +228,7 @@ def UQ2fid(vL, Upsilon, Q, z, A):
     # calculate fidelity = |<Φ|Ψ>|^2 / (<Φ|Φ> <Ψ|Ψ>)
     f = PhiPsi * PhiPsi.conj() / (PhiPhi * PsiPsi)
     f = f.norm()
-    return f
+    return f, PhiPhi, PsiPsi
 
 
 # Part II: Functions for the optimization of vL tensor
@@ -301,8 +304,74 @@ def update_vL(vL, zp, z, A, eps_pinv=1e-8,
         errNew = fidelity(vLnew, zp, z, A)[1]
         if (errNew <= errOld) or (errNew < eps_errEF):
             # print("p = {:d}".format(p))
+            vLnew = vLnew / vLnew.norm()
             break
     return vLnew, errNew, errOld
 
+
+def opt_vL(vL_init, zp, z, A, eps_pinv=1e-8,
+           eps_errEF=1e-10, iter_max=50,
+           display=True, iter_min=5):
+    """find vL that maximalize the fidelity
+
+    Args:
+        vL_initi (TensorCommon): 3-leg tensor
+        zp (TensorCommon): 1D vector
+            the renormalized bond matrix
+        z (TensorCommon): 1D vector
+            the bond matrix
+        A (TensorCommon): 4-leg tensor
+            the bulk tensor in TN
+
+    Kwargs:
+        eps_pinv (float):
+            threshold below which the eigenvalues
+            are considered as zero
+        eps_errEF (float):
+            threshold below which the EF erro
+            is considered small enough
+
+    Returns:
+        vL (TensorCommon): 3-leg tensor
+            the optimal vL
+    """
+    vL = vL_init * 1.0
+    # record error (1 - fidelity) during the iteration
+    err_hist = []
+    for k in range(iter_max):
+        # update vL
+        vL, errNew, errOld = update_vL(vL, zp, z, A, eps_pinv, eps_errEF)
+        # record evolution of errors
+        if k == 0:
+            err_hist.append(errOld)
+            err_hist.append(errNew)
+            if display:
+                print("Loop Optimization Error (initial) = {:.3e}".format(
+                    err_hist[0]))
+        else:
+            err_hist.append(errNew)
+
+        # exit the iteration if the error is very small
+        isMinIter = (k + 1 >= iter_min)
+        if isMinIter and (errNew < eps_errEF):
+            if display:
+                print("Loop Optimization Error (iter {:2d}) = {:.3e}".format(
+                    k, err_hist[-1]))
+            break
+
+        # exit the iteration if the error converges
+        if (k + 1) % iter_min == 0:
+            if display:
+                print("Loop Optimization Error (iter {:2d}) = {:.3e}".format(
+                    k, err_hist[-1]))
+            isConverge = (
+                abs((err_hist[-1] - err_hist[-1 - iter_min]) /
+                    (err_hist[-1 - iter_min] + eps_errEF)
+                    ) < (0.001 * iter_min)
+            )
+            if isConverge:
+                break
+
+    return vL, err_hist
 
 # end of file
