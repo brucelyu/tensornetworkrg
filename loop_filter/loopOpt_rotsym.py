@@ -27,7 +27,7 @@ A[x, y, x', y'] =  x'--A--x ,
 
                | j
 vL[ijα] = i -- vL           ,
-                 \ α
+                 \α
 
 while the order of ij for vL depends on the direction of
 the arrow on its TN diagram.
@@ -209,6 +209,11 @@ def A2PsiPsi(A, z):
 def fidelity(vL, zp, z, A):
     Upsilon = vL2Upsilon(vL, zp, z)
     Q = vL2Q(vL, zp, z, A)
+    f = UQ2fid(vL, Upsilon, Q, z, A)
+    return f, 1 - f, Upsilon, Q
+
+
+def UQ2fid(vL, Upsilon, Q, z, A):
     # calculate <Φ|Φ>
     PhiPhi = ncon([Upsilon, vL, vL.conj()],
                   [[1, 2, 3, 4], [5, 1, 2], [5, 3, 4]])
@@ -220,7 +225,7 @@ def fidelity(vL, zp, z, A):
     # calculate fidelity = |<Φ|Ψ>|^2 / (<Φ|Φ> <Ψ|Ψ>)
     f = PhiPsi * PhiPsi.conj() / (PhiPhi * PsiPsi)
     f = f.norm()
-    return f, 1 - f, Upsilon, Q
+    return f
 
 
 # Part II: Functions for the optimization of vL tensor
@@ -279,18 +284,23 @@ def update_vL(vL, zp, z, A, eps_pinv=1e-8,
 
     """
     # calculate old fidelity and construct Υ and P
-    _, errOld, Upsilon, Q = fidelity(vL, zp, z, A)
+    # -- Normalized vL
+    vLold = vL / vL.norm()
+    _, errOld, Upsilon, Q = fidelity(vLold, zp, z, A)
     # propose a candidate vL
     vLp = propose_vL(Upsilon, Q, eps_pinv)
+    # --- Normalized vLp
+    vLp = vLp / vLp.norm()
 
     # try 10 convex combinations of old vL and the proposed vL
     # to make sure the error goes down
     # (This idea is taken from Evenbly's TNR codes)
     for p in range(11):
-        vLnew = (1 - 0.1 * p) * vLp + 0.1 * p * vL
+        vLnew = (1 - 0.1 * p) * vLp + 0.1 * p * vLold
         # once the error reduces, we exit
         errNew = fidelity(vLnew, zp, z, A)[1]
         if (errNew <= errOld) or (errNew < eps_errEF):
+            # print("p = {:d}".format(p))
             break
     return vLnew, errNew, errOld
 

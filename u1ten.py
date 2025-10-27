@@ -52,6 +52,7 @@ def pinv(B, a=[0, 1], b=[2, 3], eps_mach=1e-10,
         d, U = B.eig(a, b, hermitian=True,
                      chis=chiCut,
                      eps=eps_mach)
+        # print("Rank in pinv is {:d}".format(d.flatten_dim(d.shape[0])))
     else:
         # perform no truncation here but soft inverse below
         d, U = B.eig(a, b, hermitian=True)
