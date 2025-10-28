@@ -346,7 +346,7 @@ def opt_vL(vL_init, zp, z, A, eps_pinv=1e-8,
             err_hist.append(errOld)
             err_hist.append(errNew)
             if display:
-                print("Loop Optimization Error (initial) = {:.3e}".format(
+                print("  --> Loop Optimization Error (initial) = {:.3e}".format(
                     err_hist[0]))
         else:
             err_hist.append(errNew)
@@ -355,15 +355,15 @@ def opt_vL(vL_init, zp, z, A, eps_pinv=1e-8,
         isMinIter = (k + 1 >= iter_min)
         if isMinIter and (errNew < eps_errEF):
             if display:
-                print("Loop Optimization Error (iter {:2d}) = {:.3e}".format(
-                    k, err_hist[-1]))
+                print("  --> Loop Optimization Error (iter {:2d}) = {:.3e}".format(
+                    k+1, err_hist[-1]))
             break
 
         # exit the iteration if the error converges
         if (k + 1) % iter_min == 0:
             if display:
-                print("Loop Optimization Error (iter {:2d}) = {:.3e}".format(
-                    k, err_hist[-1]))
+                print("  --> Loop Optimization Error (iter {:2d}) = {:.3e}".format(
+                    k+1, err_hist[-1]))
             isConverge = (
                 abs((err_hist[-1] - err_hist[-1 - iter_min]) /
                     (err_hist[-1 - iter_min] + eps_errEF)

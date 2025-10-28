@@ -1055,8 +1055,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
             # In this scheme, a pair of two isometries
             # has opposite arrow for input legs
             self.init_dw()
-            if isloopOpt is False:
-                self.boundary = "anti-parallel"
+            self.boundary = "anti-parallel"
 
         # read parameters for the block-tensor part
         chi = pars["chi"]
@@ -1082,8 +1081,16 @@ class TensorNetworkRG2D(TensorNetworkRG):
             vL, bondzp, errTRG, sval, v = trg_rotsym.init_trg(Ap, chi, cg_eps)
             SPerrList.append(errTRG)
 
+            if display and n == 0:
+                print("  -- Intermediate bond matrix z is")
+                if (bondzp.to_ndarray() == 1).all():
+                    print("  It is trivally all 1!")
+                else:
+                    print(bondzp)
+
             # Step 2. Update vL using loop optimzation
             if isloopOpt and n == 0:
+                print("Perform the loop optimization...")
                 eps_pinv = pars["eps_pinv"]
                 eps_errEF = pars["eps_errEF"]
                 LF_max = pars["LF_max"]
@@ -1104,12 +1111,16 @@ class TensorNetworkRG2D(TensorNetworkRG):
                 )[1:]
                 # print out the Loop filtering error
                 if display:
-                    print("  Initial LF error is {:.3e}".format(errLF0))
-                    print("    Final LF error is {:.3e}".format(errLF1))
+                    print("----------")
+                    print("    Initial LF error is {:.3e}".format(errLF0))
+                    print("      Final LF error is {:.3e}".format(errLF1))
+                    print("----------")
                 # -- 2.2 Take care of the norm of vL
                 #        to make sure that <ψ|ψ> = <φ|φ>
                 PsiDivPhi = (PsiPsi / PhiPhi1).norm()
                 vL = vL * (PsiDivPhi)**(1/16)
+                # The Loop filtering error
+                lrerr = errLF1 * 1.0
 
             # Step 3. Perform the TRG contraction
             Ap = trg_rotsym.contrvLz(vL, zp)
@@ -1132,7 +1143,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
             print("The TRG splitting error is {:.2e} and {:.2e}".format(
                 SPerrList[0], SPerrList[1]))
             if isloopOpt:
-                print("The loop optimization error is {:.2e}".format(errLF1))
+                print("The loop optimization error is {:.2e}".format(lrerr))
 
             print("  -- About the bond matrix z:")
             if (bondzp.to_ndarray() == 1).all():
@@ -1143,11 +1154,10 @@ class TensorNetworkRG2D(TensorNetworkRG):
             sArr = sval / sval.max()
             self.printArray(sArr)
 
-
-
         # return errors
         return lrerr, errTRG
 
+    # Collection of various RG maps
     def rgmap(self, tnrg_pars,
               scheme="fet-hotrg", ver="base",
               signFix=False, isFixChi=False):
@@ -1233,6 +1243,12 @@ class TensorNetworkRG2D(TensorNetworkRG):
                 (lferrs,
                  SPerrs
                  ) = self.efrg_loopOpt(tnrg_pars)
+        elif scheme == "loop-TNR":
+            if ver == "rotsym":
+                # symmetric scheme with bond matrix
+                (lferrs,
+                 SPerrs
+                 ) = self.trg_loopOpt(tnrg_pars, isloopOpt=True)
         return lferrs, SPerrs
 
     def init_dw(self):
