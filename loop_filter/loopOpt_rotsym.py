@@ -300,10 +300,11 @@ def update_vL(vL, zp, z, A, eps_pinv=1e-8,
     # (This idea is taken from Evenbly's TNR codes)
     for p in range(11):
         vLnew = (1 - 0.1 * p) * vLp + 0.1 * p * vLold
+        # newPortion = (1 - 0.1 * p)
         # once the error reduces, we exit
         errNew = fidelity(vLnew, zp, z, A)[1]
         if (errNew <= errOld) or (errNew < eps_errEF):
-            # print("p = {:d}".format(p))
+            # print("{:.0%} of new solution is mixed!".format(newPortion))
             vLnew = vLnew / vLnew.norm()
             break
     return vLnew, errNew, errOld
