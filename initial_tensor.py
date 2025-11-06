@@ -277,16 +277,17 @@ def hardDisk_sqlat1NN(z, scheme="IRF"):
             [1, 2], [5, 8], [3, 4], [7, 6]
         ])
     elif scheme == "trgR":
-        # real representation for the negative activity case
-        errMsg = "The activity z should be non positive!"
-        assert z <= 0, errMsg
+        # real representation using TRG splitting
         # The 3-leg copy dot tensor
         cp = Tensor.zeros([2, 2, 2])
         cm = Tensor.zeros([2, 2, 2])
         cp[0, 0, 0] = 1
         cp[1, 1, 1] = np.sqrt(np.abs(z))
-        cm[0, 0, 0] = 1
-        cm[1, 1, 1] = -np.sqrt(np.abs(z))
+        if z >= 0:
+            cm = cp * 1.0
+        else:
+            cm[0, 0, 0] = 1
+            cm[1, 1, 1] = -np.sqrt(np.abs(z))
         # The 1NN matrix
         W = Tensor.zeros([2, 2])
         W[0, 0] = 1
