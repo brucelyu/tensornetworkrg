@@ -1090,7 +1090,8 @@ class TensorNetworkRG2D(TensorNetworkRG):
 
             # Step 2. Update vL using loop optimzation
             if isloopOpt and n == 0:
-                print("Perform the loop optimization...")
+                if display:
+                    print("Perform the loop optimization...")
                 eps_pinv = pars["eps_pinv"]
                 eps_errEF = pars["eps_errEF"]
                 LF_max = pars["LF_max"]
@@ -1103,7 +1104,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
                 vL, errLF_hist = loopOpt_rotsym.opt_vL(
                     vL, bondzp, zp, Ap,
                     eps_pinv, eps_errEF,
-                    iter_max=LF_max, display=True, iter_min=LF_min
+                    iter_max=LF_max, display=display, iter_min=LF_min
                 )
                 # Loop filtering error after the optimization
                 errLF1, PhiPhi1, PsiPsi = loopOpt_rotsym.fidelity(
@@ -1155,7 +1156,7 @@ class TensorNetworkRG2D(TensorNetworkRG):
             self.printArray(sArr)
 
         # return errors
-        return lrerr, errTRG
+        return lrerr, SPerrList
 
     # Collection of various RG maps
     def rgmap(self, tnrg_pars,
