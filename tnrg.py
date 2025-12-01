@@ -1434,6 +1434,13 @@ class TensorNetworkRG2D(TensorNetworkRG):
 
     def degIndX2(self, direction="y"):
         tm = self.generate_tm(direction=direction)
+        d = tm.eig([0], [1])[0]
+        trsq = d.abs().sum()**2
+        sqtr = ((d.abs())**2).sum()
+        return trsq / sqtr
+
+    def degIndX2old(self, direction="y"):
+        tm = self.generate_tm(direction=direction)
         s = tm.svd([0], [1])[1]
         trsq = s.sum()**2
         sqtr = (s**2).sum()
